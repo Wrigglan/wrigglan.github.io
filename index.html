@@ -140,7 +140,7 @@
     <button class="btn start" id="startBtn">Starta motorn</button>
     <div class="rows">
       <div class="ctrl"><label for="vol">Volym</label><button type="button" class="vbtn" id="volDown" aria-label="Sänk volymen">−</button><input type="range" id="vol" min="0" max="100" step="5" value="70"><button type="button" class="vbtn" id="volUp" aria-label="Höj volymen">+</button><span class="val" id="volV">70 %</span></div>
-      <div class="ctrl"><label for="demoSpd">Demofart</label><input type="range" id="demoSpd" min="0" max="160" value="0" disabled><span class="val" id="demoV">0 km/h</span></div>
+      <div class="ctrl"><label for="demoSpd">Demofart</label><input type="range" id="demoSpd" min="0" max="201" value="0" disabled><span class="val" id="demoV">0 km/h</span></div>
     </div>
     <div class="side">
       <button class="btn toggle" id="demoBtn">Demoläge: av</button>
@@ -211,7 +211,7 @@ const ENGINES = {
     fire:[[0,0],[60,1],[120,0],[180,1],[240,0],[300,1],[360,0],[420,1],[480,0],[540,1],[600,0],[660,1]],
     idle:700, redline:2600, launch:1200, inertia:0.26, flutter:0,
     // Verklig toppfart ca 72 km/h – utväxlingen är sträckt så att den följer bilens fart
-    gears:[11,19,33,58], upCruise:2100, upFull:2450, down:1000, shiftTime:0.6, aRef:6,
+    gears:[11,19,33,55,80], upCruise:2100, upFull:2450, down:1000, shiftTime:0.6, aRef:6,
     pulseTau:0.0019, noiseMix:0.3, noiseTau:0.004, variance:0.08, misfire:0,
     knock:0.32, knockFreq:2900,
     banks:2, bankDetune:1.04,
@@ -227,7 +227,7 @@ const ENGINES = {
     cylinders:1, cycleDeg:360,
     fire:[[0,0]],
     idle:260, redline:650, launch:380, inertia:0.6, flutter:0.07,
-    gears:[34,48.5,69,98.5,140,200], upCruise:480, upFull:610, down:285, shiftTime:0.9, aRef:6,
+    gears:[54,78,110,158,224,320], upCruise:480, upFull:610, down:285, shiftTime:0.9, aRef:6,
     pulseTau:0.0065, noiseMix:0.55, noiseTau:0.035, variance:0.25, misfire:0.05,
     knock:0.22, knockFreq:950,
     banks:1, bankDetune:1,
