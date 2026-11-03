@@ -222,20 +222,21 @@ const ENGINES = {
     turbo:{type:'turbo', fmin:900, fmax:4300, gain:0.06, whoosh:0.05, up:1.3, down:2.2},
     fan:{k:0.95, q:6, gain:0.04}, prop:null, tracks:0.22, wind:0, gain:2.0
   },
-  hotbulb: {
-    id:'hotbulb', name:'Tändkulemotor', desc:'Encylindrig tvåtakts glödkulemotor à la Bolinder – tuff-tuff, 260–650 r/min',
-    cylinders:1, cycleDeg:360,
-    fire:[[0,0]],
-    idle:260, redline:650, launch:380, inertia:0.6, flutter:0.07,
-    gears:[54,78,110,158,224,320], upCruise:480, upFull:610, down:285, shiftTime:0.9, aRef:6,
-    pulseTau:0.0065, noiseMix:0.55, noiseTau:0.035, variance:0.25, misfire:0.05,
-    knock:0.22, knockFreq:950,
+  busa: {
+    id:'busa', name:'Hayabusa', desc:'Suzuki Hayabusa 1340 cc rak fyra – skrikig motorcykel, 6 växlar, 11 000 r/min',
+    cylinders:4, cycleDeg:720,
+    // Rak fyra, tändföljd 1-2-4-3 med jämna 180° – gemensam 4-in-1-avgas
+    fire:[[0,0],[180,0],[360,0],[540,0]],
+    idle:1150, redline:11000, launch:3500, inertia:0.03, flutter:0,
+    gears:[11.5,15,18.5,21.5,24,26.5], upCruise:4200, upFull:10500, down:2500, shiftTime:0.08, aRef:12,
+    pulseTau:0.0006, noiseMix:0.3, noiseTau:0.002, variance:0.08, misfire:0,
+    knock:0, knockFreq:3500,
     banks:1, bankDetune:1,
-    res:[[52,1.2,1.0],[145,2.0,0.6],[400,2.5,0.3],[1100,3,0.08]], direct:0.25,
-    pipeMs:20, pipeFb:-0.6, pipeDamp:0.45,
-    lpLow:450, lpHigh:1800, driveLow:1.4, driveHigh:2.4,
-    pops:0, popMinRpm:99999, intake:0.05, intakeFc:300, mech:0.02, mechFreq:1200,
-    turbo:null, fan:null, prop:null, tracks:0, wind:0, gain:3.0
+    res:[[160,1.2,0.8],[480,1.8,1.0],[1250,2.4,0.6],[3000,3,0.3]], direct:0.35,
+    pipeMs:4, pipeFb:-0.45, pipeDamp:0.25,
+    lpLow:1600, lpHigh:10000, driveLow:1.4, driveHigh:3.6,
+    pops:0.04, popMinRpm:4000, intake:0.2, intakeFc:1600, mech:0.035, mechFreq:4200,
+    turbo:null, fan:null, prop:null, tracks:0, wind:0.05, gain:2.0
   }
 };
 /*ENGINES-END*/
