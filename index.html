@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#111214">
+<link rel="icon" href="data:,">
+<title>Motorljud – välj din motor</title>
+<style>
+  :root{
+    --bg:#0e0f11; --panel:#17191c; --panel2:#1f2226; --line:#2b2f35;
+    --txt:#f2f3f5; --dim:#9aa0a8; --acc:#3e6ae1; --acc2:#5b84ff; --red:#e82127; --ok:#33c26b; --warn:#f0a020;
+    --r:18px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+    font-family:"Gotham SSm","Gotham","Helvetica Neue",Arial,system-ui,sans-serif;user-select:none;-webkit-user-select:none;overflow:hidden}
+  .app{display:grid;grid-template-rows:auto 1fr auto;height:100vh;padding:1.6vh 1.6vw;gap:1.6vh}
+  header{display:flex;align-items:center;justify-content:space-between;gap:1vw}
+  h1{margin:0;font-size:clamp(20px,2.4vw,46px);font-weight:600;letter-spacing:.02em}
+  h1 span{color:var(--dim);font-weight:400}
+  .chips{display:flex;gap:.7vw;flex-wrap:wrap;justify-content:flex-end}
+  .chip{display:flex;align-items:center;gap:.5em;background:var(--panel);border:1px solid var(--line);border-radius:999px;
+    padding:.45em 1em;font-size:clamp(12px,1.05vw,20px);color:var(--dim);white-space:nowrap}
+  .dot{width:.7em;height:.7em;border-radius:50%;background:#555}
+  .dot.ok{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.err{background:var(--red)}
+  main{display:grid;grid-template-columns:1.15fr 1fr;gap:1.6vw;min-height:0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);min-height:0}
+  .gauge{position:relative;display:flex;align-items:center;justify-content:center;padding:1vh}
+  #tach{width:100%;height:100%;display:block}
+  .right{display:grid;grid-template-rows:auto 1fr;gap:1.6vh;min-height:0}
+  .readout{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:1vw;padding:1.6vh 1.4vw;align-items:end}
+  .big{font-size:clamp(48px,7.2vw,150px);font-weight:300;line-height:.9;font-variant-numeric:tabular-nums}
+  .mid{font-size:clamp(30px,3.6vw,76px);font-weight:400;line-height:1;font-variant-numeric:tabular-nums}
+  .lbl{color:var(--dim);font-size:clamp(12px,1.1vw,22px);margin-top:.5em;letter-spacing:.06em;text-transform:uppercase}
+  .engines{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:1vh 1vw;padding:1.4vh 1.2vw;min-height:0}
+  .eng{appearance:none;border:2px solid var(--line);background:var(--panel2);color:var(--txt);border-radius:14px;text-align:left;
+    padding:1.1vh 1.1vw;cursor:pointer;display:flex;flex-direction:column;justify-content:center;min-height:0;transition:border-color .15s,background .15s}
+  .eng b{font-size:clamp(16px,1.6vw,32px);font-weight:600}
+  .eng small{color:var(--dim);font-size:clamp(11px,.95vw,19px);margin-top:.35em;line-height:1.25}
+  .eng.sel{border-color:var(--acc2);background:#1d2a4a}
+  .eng:active{transform:scale(.985)}
+  .eng.wide{grid-column:span 2}
+  footer{display:grid;grid-template-columns:auto 1fr auto;gap:1.6vw;align-items:stretch}
+  .btn{appearance:none;border:0;border-radius:14px;background:var(--panel2);color:var(--txt);font:inherit;
+    font-size:clamp(16px,1.5vw,30px);font-weight:600;padding:0 2vw;min-height:clamp(56px,8vh,110px);cursor:pointer;border:1px solid var(--line)}
+  .btn:active{filter:brightness(1.25)}
+  .btn.start{background:var(--acc);border-color:var(--acc);min-width:clamp(160px,17vw,340px);font-size:clamp(20px,2vw,40px)}
+  .btn.start.on{background:var(--red);border-color:var(--red)}
+  .btn.toggle.on{background:#1d2a4a;border-color:var(--acc2);color:#fff}
+  .ctrl{display:flex;align-items:center;gap:1.2vw;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:0 1.4vw;min-width:0}
+  .ctrl label{color:var(--dim);font-size:clamp(12px,1.1vw,22px);white-space:nowrap;min-width:5.5em}
+  .ctrl .val{font-variant-numeric:tabular-nums;min-width:4.2em;text-align:right;font-size:clamp(14px,1.2vw,24px)}
+  .rows{display:grid;grid-template-rows:1fr 1fr;gap:1vh}
+  input[type=range]{-webkit-appearance:none;appearance:none;flex:1;height:clamp(36px,5vh,64px);background:transparent;min-width:0}
+  input[type=range]::-webkit-slider-runnable-track{height:12px;border-radius:6px;background:#33373e}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:clamp(30px,2.6vw,52px);height:clamp(30px,2.6vw,52px);border-radius:50%;
+    background:#fff;margin-top:calc((12px - clamp(30px,2.6vw,52px))/2);box-shadow:0 2px 8px #0008}
+  input[type=range]::-moz-range-track{height:12px;border-radius:6px;background:#33373e}
+  input[type=range]::-moz-range-thumb{width:40px;height:40px;border-radius:50%;background:#fff;border:0}
+  input[type=range]:disabled{opacity:.35}
+  .side{display:flex;flex-direction:column;gap:1vh}
+  .side .btn{flex:1;min-height:0}
+  #msg{position:fixed;left:50%;top:12vh;transform:translateX(-50%);max-width:70vw;background:#2a1a1a;border:1px solid var(--red);
+    color:#ffd9d9;padding:1.2em 1.6em;border-radius:14px;font-size:clamp(14px,1.3vw,26px);display:none;z-index:5;box-shadow:0 10px 40px #000a}
+  #msg.info{background:#1a2238;border-color:var(--acc2);color:#dfe7ff}
+  #msg button{margin-top:.8em}
+  .credit{color:#5d636b;font-size:clamp(10px,.75vw,15px);text-align:center;margin-top:.4vh}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Motorljud <span id="engTitle">· V8</span></h1>
+    <div class="chips">
+      <div class="chip"><span class="dot" id="dGps"></span><span id="tGps">GPS: av</span></div>
+      <div class="chip"><span class="dot" id="dAud"></span><span id="tAud">Ljud: av</span></div>
+      <div class="chip"><span class="dot" id="dWake"></span><span id="tWake">Skärm: normal</span></div>
+    </div>
+  </header>
+
+  <main>
+    <div class="card gauge"><canvas id="tach" aria-label="Varvräknare"></canvas></div>
+    <div class="right">
+      <div class="card readout">
+        <div><div class="big" id="spd">0</div><div class="lbl">km/h</div></div>
+        <div><div class="mid" id="gear">N</div><div class="lbl" id="gearLbl">Växel</div></div>
+        <div><div class="mid" id="rpm">0</div><div class="lbl">r/min</div></div>
+      </div>
+      <div class="card engines" id="engines"></div>
+    </div>
+  </main>
+
+  <footer>
+    <button class="btn start" id="startBtn">Starta motorn</button>
+    <div class="rows">
+      <div class="ctrl"><label for="vol">Volym</label><input type="range" id="vol" min="0" max="100" value="70"><span class="val" id="volV">70 %</span></div>
+      <div class="ctrl"><label for="demoSpd">Demofart</label><input type="range" id="demoSpd" min="0" max="160" value="0" disabled><span class="val" id="demoV">0 km/h</span></div>
+    </div>
+    <div class="side">
+      <button class="btn toggle" id="demoBtn">Demoläge: av</button>
+      <button class="btn" id="tripBtn" disabled>Kör testrunda</button>
+    </div>
+  </footer>
+  <div class="credit">Alla ljud syntetiseras i realtid med Web Audio – inga inspelade ljudfiler. Ljudet är en simulering och följer GPS-hastigheten. Ha alltid fokus på trafiken.</div>
+</div>
+<div id="msg"></div>
+
+<script>
+"use strict";
+/*ENGINES-START*/
+// Motorer. gears = km/h per 1000 r/min i varje växel. Vinklar = tändvinklar (grader) i arbetscykeln.
+const ENGINES = {
+  v8: {
+    id:'v8', name:'V8', desc:'Amerikansk muscle car – cross-plane-mullrande, 6 växlar',
+    cylinders:8, cycleDeg:720,
+    // GM-tändföljd 1-8-4-3-6-5-7-2, udda = vänster bank (0), jämna = höger (1) -> ojämn puls per bank = "burble"
+    fire:[[0,0],[90,1],[180,1],[270,0],[360,1],[450,0],[540,0],[630,1]],
+    idle:720, redline:6400, launch:2000, inertia:0.075, flutter:0,
+    gears:[11.5,17,24,31,40,52], upCruise:2100, upFull:5900, down:1200, shiftTime:0.32, aRef:10,
+    pulseTau:0.0016, noiseMix:0.35, noiseTau:0.004, variance:0.22, misfire:0,
+    knock:0, knockFreq:2500,
+    banks:2, bankDetune:1.08,
+    res:[[95,1.1,1.0],[300,2.0,0.6],[820,2.6,0.28],[1900,3,0.08]], direct:0.25,
+    pipeMs:9, pipeFb:-0.5, pipeDamp:0.35,
+    lpLow:900, lpHigh:5200, driveLow:1.3, driveHigh:3.4,
+    pops:0.07, popMinRpm:2200, intake:0.10, intakeFc:700, mech:0.025, mechFreq:2600,
+    turbo:null, fan:null, prop:null, tracks:0, wind:0, gain:1.8
+  },
+  v12: {
+    id:'v12', name:'V12', desc:'Mjuk och högvarvig italiensk V12 – 7 växlar, 8 700 r/min',
+    cylinders:12, cycleDeg:720,
+    fire:[[0,0],[60,1],[120,0],[180,1],[240,0],[300,1],[360,0],[420,1],[480,0],[540,1],[600,0],[660,1]],
+    idle:950, redline:8700, launch:3000, inertia:0.045, flutter:0,
+    gears:[8.5,12.5,16.5,21,26,32,40], upCruise:2800, upFull:8300, down:1600, shiftTime:0.12, aRef:10,
+    pulseTau:0.0007, noiseMix:0.22, noiseTau:0.0025, variance:0.06, misfire:0,
+    knock:0, knockFreq:3000,
+    banks:2, bankDetune:1.03,
+    res:[[175,1.0,1.0],[520,1.6,0.75],[1350,2.2,0.5],[2700,3,0.28]], direct:0.3,
+    pipeMs:5, pipeFb:-0.4, pipeDamp:0.25,
+    lpLow:1800, lpHigh:9500, driveLow:1.2, driveHigh:2.8,
+    pops:0.025, popMinRpm:3500, intake:0.16, intakeFc:1400, mech:0.03, mechFreq:3800,
+    turbo:null, fan:null, prop:null, tracks:0, wind:0, gain:1.8
+  },
+  merlin: {
+    id:'merlin', name:'Spitfire', desc:'Rolls-Royce Merlin V12, 27 liter – kompressor och propeller',
+    cylinders:12, cycleDeg:720, mode:'prop',
+    fire:[[0,0],[60,1],[120,0],[180,1],[240,0],[300,1],[360,0],[420,1],[480,0],[540,1],[600,0],[660,1]],
+    idle:650, redline:3000, cruise:2650, inertia:0.18, flutter:0,
+    gears:[1], upCruise:0, upFull:0, down:0, shiftTime:0, aRef:8,
+    pulseTau:0.0013, noiseMix:0.5, noiseTau:0.003, variance:0.14, misfire:0.01,
+    knock:0.06, knockFreq:1800,
+    banks:2, bankDetune:1.05,
+    res:[[110,1.0,1.0],[330,1.6,0.75],[1050,2.4,0.45],[2300,3,0.15]], direct:0.4,
+    pipeMs:3, pipeFb:-0.3, pipeDamp:0.3,
+    lpLow:1400, lpHigh:7000, driveLow:2.0, driveHigh:4.2,
+    pops:0.05, popMinRpm:1500, intake:0.08, intakeFc:900, mech:0.035, mechFreq:2100,
+    // tvåstegskompressor: mekaniskt driven -> tonhöjd direkt proportionell mot varvtalet
+    turbo:{type:'sc', fmin:0, fk:0.62, gain:0.05, whoosh:0.03},
+    fan:null, prop:{blades:4, reduction:0.477, gain:0.18}, tracks:0, wind:0.10, gain:1.5
+  },
+  strv122: {
+    id:'strv122', name:'Stridsvagn 122', desc:'MTU MB 873 V12-diesel, 47,6 liter, 1500 hk – turbovissel och tunga band, 4 växlar',
+    cylinders:12, cycleDeg:720,
+    fire:[[0,0],[60,1],[120,0],[180,1],[240,0],[300,1],[360,0],[420,1],[480,0],[540,1],[600,0],[660,1]],
+    idle:700, redline:2600, launch:1200, inertia:0.26, flutter:0,
+    // Verklig toppfart ca 72 km/h – utväxlingen är sträckt så att den följer bilens fart
+    gears:[11,19,33,58], upCruise:2100, upFull:2450, down:1000, shiftTime:0.6, aRef:6,
+    pulseTau:0.0019, noiseMix:0.3, noiseTau:0.004, variance:0.08, misfire:0,
+    knock:0.32, knockFreq:2900,
+    banks:2, bankDetune:1.04,
+    res:[[68,1.0,1.0],[200,1.5,0.6],[540,2.0,0.3],[1300,3,0.1]], direct:0.2,
+    pipeMs:12, pipeFb:-0.5, pipeDamp:0.4,
+    lpLow:650, lpHigh:3000, driveLow:1.4, driveHigh:3.0,
+    pops:0, popMinRpm:99999, intake:0.12, intakeFc:500, mech:0.03, mechFreq:1700,
+    turbo:{type:'turbo', fmin:900, fmax:4300, gain:0.06, whoosh:0.05, up:1.3, down:2.2},
+    fan:{k:0.95, q:6, gain:0.04}, prop:null, tracks:0.22, wind:0, gain:2.0
+  },
+  hotbulb: {
+    id:'hotbulb', name:'Tändkulemotor', desc:'Encylindrig tvåtakts glödkulemotor à la Bolinder – tuff-tuff, 260–650 r/min',
+    cylinders:1, cycleDeg:360,
+    fire:[[0,0]],
+    idle:260, redline:650, launch:380, inertia:0.6, flutter:0.07,
+    gears:[34,48.5,69,98.5,140,200], upCruise:480, upFull:610, down:285, shiftTime:0.9, aRef:6,
+    pulseTau:0.0065, noiseMix:0.55, noiseTau:0.035, variance:0.25, misfire:0.05,
+    knock:0.22, knockFreq:950,
+    banks:1, bankDetune:1,
+    res:[[52,1.2,1.0],[145,2.0,0.6],[400,2.5,0.3],[1100,3,0.08]], direct:0.25,
+    pipeMs:20, pipeFb:-0.6, pipeDamp:0.45,
+    lpLow:450, lpHigh:1800, driveLow:1.4, driveHigh:2.4,
+    pops:0, popMinRpm:99999, intake:0.05, intakeFc:300, mech:0.02, mechFreq:1200,
+    turbo:null, fan:null, prop:null, tracks:0, wind:0, gain:3.0
+  }
+};
+/*ENGINES-END*/
+
+/*DSP-START*/
+function dspFactory(){
+  const TAU = Math.PI*2;
+  function bpCoef(s,f,q,sr){
+    f = Math.min(f, sr*0.45);
+    const w=TAU*f/sr, al=Math.sin(w)/(2*q), a0=1+al;
+    s.b0=al/a0; s.b2=-al/a0; s.a1=-2*Math.cos(w)/a0; s.a2=(1-al)/a0; return s;
+  }
+  function bp(f,q,sr){ return bpCoef({x1:0,x2:0,y1:0,y2:0},f,q,sr); }
+  function run(s,x){ const y=s.b0*x+s.b2*s.x2-s.a1*s.y1-s.a2*s.y2; s.x2=s.x1; s.x1=x; s.y2=s.y1; s.y1=y; return y; }
+  function onePoleK(fc,sr){ return 1-Math.exp(-TAU*fc/sr); }
+
+  class EngineDSP{
+    constructor(sr){ this.sr=sr; this.cfg=null; this.tRpm=0; this.tLoad=0; this.speed=0; this.rpm=0; this.load=0;
+      this.pos=0; this.fade=0; this.on=false; this.seed=12345; this.ctr=0; }
+    rnd(){ // snabb deterministisk brusgenerator, -1..1
+      let x=this.seed; x^=x<<13; x^=x>>>17; x^=x<<5; this.seed=x|0; return ((x>>>0)/4294967296)*2-1; }
+    setConfig(c){
+      const sr=this.sr; this.cfg=c;
+      this.fire=c.fire.map(f=>[f[0]/c.cycleDeg,f[1]]);
+      this.banks=[];
+      for(let b=0;b<c.banks;b++){
+        const det = b===0?1:c.bankDetune;
+        const D=Math.max(8,Math.round(c.pipeMs*det*sr/1000));
+        this.banks.push({s1:0,s2:0,nEnv:0,buf:new Float32Array(D),D,w:0,lp:0,
+          res:c.res.map(r=>({f:bp(r[0]*det,r[1],sr),g:r[2]}))});
+      }
+      this.cPulse=Math.exp(-1/(c.pulseTau*sr)); this.pNorm=c.pulseTau*sr*Math.E;
+      this.dNoise=Math.exp(-1/(c.noiseTau*sr));
+      this.knockBp=bp(c.knockFreq,2.5,sr); this.knockEnv=0; this.dKnock=Math.exp(-1/(0.0012*sr));
+      this.popBp=bp(1700,0.8,sr); this.popEnv=0; this.dPop=Math.exp(-1/(0.004*sr)); this.popDelay=0; this.popPending=0;
+      this.mechBp=bp(c.mechFreq,1.4,sr); this.intakeLp=0; this.kIn=onePoleK(c.intakeFc,sr);
+      this.whPh=0; this.spool=0; this.whooshBp=bp(2400,0.9,sr);
+      this.fanBp=bp(1000,c.fan?c.fan.q:5,sr);
+      this.propPh=0; this.propLp=0; this.kProp=onePoleK(500,sr); this.windLp=0; this.kWind=onePoleK(350,sr);
+      this.trackPh=0; this.trackEnv=0; this.trackBp1=bp(820,7,sr); this.trackBp2=bp(2300,9,sr); this.trackLow=bp(160,1.5,sr); this.dTrack=Math.exp(-1/(0.012*sr));
+      this.lp1=[0,0]; this.lp2=[0,0]; this.dcx=[0,0]; this.dcy=[0,0];
+      this.kR=1-Math.exp(-1/(c.inertia*sr)); this.kL=1-Math.exp(-1/(0.06*sr));
+      if(this.rpm<=0) this.rpm=c.idle;
+      this.kLP=0.2; this.drive=1;
+    }
+    setParams(p){ if(p.rpm!=null)this.tRpm=p.rpm; if(p.load!=null)this.tLoad=p.load; if(p.speed!=null)this.speed=p.speed; if(p.on!=null)this.on=p.on; }
+    process(L,R,n){
+      const c=this.cfg; if(!c){ for(let i=0;i<n;i++){L[i]=0;R[i]=0;} return; }
+      const sr=this.sr, banks=this.banks, nb=banks.length, fire=this.fire, nf=fire.length;
+      const rng=c.redline-c.idle;
+      // blockvisa parametrar
+      const rN0=Math.max(0,Math.min(1,(this.rpm-c.idle)/rng));
+      const lp0=Math.max(0,this.load), ln0=Math.max(0,-this.load);
+      const fc=c.lpLow+(c.lpHigh-c.lpLow)*Math.min(1,0.35*rN0+0.75*lp0)*(1-0.35*ln0);
+      const kLP=onePoleK(fc,sr);
+      const drive=c.driveLow+(c.driveHigh-c.driveLow)*lp0;
+      const lvl=(0.42+0.58*(0.45*rN0+0.55*lp0))*(1-0.4*ln0);
+      if(c.fan){ bpCoef(this.fanBp, 120+this.rpm*c.fan.k, c.fan.q, sr); }
+      const fadeTarget=this.on?1:0, kF=1-Math.exp(-1/(0.12*sr));
+      const spdMs=this.speed/3.6;
+      for(let i=0;i<n;i++){
+        this.rpm+=(this.tRpm-this.rpm)*this.kR;
+        this.load+=(this.tLoad-this.load)*this.kL;
+        this.fade+=(fadeTarget-this.fade)*kF;
+        const load=this.load, lp=load>0?load:0, ln=load<0?-load:0;
+        const rN=Math.max(0,Math.min(1,(this.rpm-c.idle)/rng));
+        // momentant varvtal (svänghjulsfluktuation för encylindriga motorer)
+        let rpmI=this.rpm;
+        if(c.flutter) rpmI*=1+c.flutter*Math.sin(TAU*(this.pos-0.15));
+        const inc=(rpmI/60)*(360/c.cycleDeg)/sr;
+        const nxt=this.pos+inc;
+        for(let k=0;k<nf;k++){
+          const f=fire[k][0];
+          if((f>this.pos&&f<=nxt)||(nxt>=1&&f+1<=nxt)){
+            const varScale=c.variance*(1+1.4*(1-rN));
+            if(c.misfire && this.rnd()*0.5+0.5 < c.misfire*(1-rN)*(1-lp)) continue;
+            let a=(0.5+0.5*lp)*(1-0.55*ln)*(1+varScale*this.rnd());
+            const b=banks[fire[k][1]%nb];
+            b.s1+=a*(1-this.cPulse); b.nEnv=Math.max(b.nEnv,a);
+            if(c.knock) this.knockEnv=Math.max(this.knockEnv,a*c.knock*(0.6+0.6*lp));
+            // baksmällar vid motorbroms
+            if(c.pops && ln>0.15 && this.rpm>c.popMinRpm && (this.rnd()*0.5+0.5)<c.pops*ln){
+              this.popPending=1; this.popDelay=Math.floor(sr*(0.004+0.01*(this.rnd()*0.5+0.5)));
+              this.popAmp=0.8+0.6*(this.rnd()*0.5+0.5);
+            }
+          }
+        }
+        this.pos=nxt>=1?nxt-1:nxt;
+        if(this.popPending){ if(--this.popDelay<=0){ this.popPending=0; this.popEnv=this.popAmp; banks[0].s1+=this.popAmp*0.6*(1-this.cPulse);} }
+
+        let outL=0,outR=0;
+        for(let b=0;b<nb;b++){
+          const B=banks[b];
+          B.s1*=this.cPulse; B.s2=B.s2*this.cPulse+B.s1;
+          let x=B.s2*this.pNorm*(1-this.cPulse) + c.noiseMix*B.nEnv*this.rnd();
+          B.nEnv*=this.dNoise;
+          // avgasrör: kamfilter med dämpad återkoppling
+          const rd=B.buf[B.w];
+          B.lp+= (rd-B.lp)*(1-c.pipeDamp);
+          const y=x+c.pipeFb*B.lp;
+          B.buf[B.w]=y; if(++B.w>=B.D)B.w=0;
+          let o=c.direct*y;
+          for(let r=0;r<B.res.length;r++){ const R0=B.res[r]; o+=R0.g*run(R0.f,y); }
+          if(nb===1){ outL+=o; outR+=o; }
+          else if(b===0){ outL+=o; outR+=o*0.55; } else { outR+=o; outL+=o*0.55; }
+        }
+        let common=0;
+        // dieselknack / mekaniskt slag
+        if(this.knockEnv>1e-5){ common+=run(this.knockBp,this.rnd()*this.knockEnv)*1.2; this.knockEnv*=this.dKnock; }
+        // baksmälla
+        if(this.popEnv>1e-4){ common+=run(this.popBp,this.rnd()*this.popEnv)*1.6; this.popEnv*=this.dPop; }
+        // insug och mekaniskt brus
+        this.intakeLp+=(this.rnd()-this.intakeLp)*this.kIn;
+        common+=this.intakeLp*c.intake*(0.25+lp)*(0.3+rN)*3;
+        common+=run(this.mechBp,this.rnd())*c.mech*(0.3+rN);
+        // turbo / kompressor
+        if(c.turbo){
+          const T=c.turbo; let f, amp;
+          if(T.type==='sc'){ this.spool=rN; f=this.rpm*T.fk; amp=T.gain*(0.25+0.75*rN)*(0.5+0.5*lp); }
+          else{
+            const tgt=Math.pow(rN,1.4)*(0.25+0.75*lp);
+            const tc=tgt>this.spool?T.up:T.down; this.spool+=(tgt-this.spool)/(tc*sr);
+            f=T.fmin+(T.fmax-T.fmin)*this.spool; amp=T.gain*this.spool*this.spool*3;
+          }
+          this.whPh+=TAU*f/sr; if(this.whPh>TAU)this.whPh-=TAU;
+          common+=amp*(Math.sin(this.whPh)+0.25*Math.sin(2*this.whPh+0.7));
+          common+=run(this.whooshBp,this.rnd())*T.whoosh*this.spool*(0.4+lp);
+        }
+        if(c.fan){ common+=run(this.fanBp,this.rnd())*c.fan.gain*(0.3+rN)*2; }
+        // propeller (bladpassagefrekvens) och fartvind
+        if(c.prop){
+          const P=c.prop; const bpf=this.rpm*P.reduction/60*P.blades;
+          this.propPh+=bpf/sr; if(this.propPh>=1)this.propPh-=1;
+          const pc=Math.cos(TAU*this.propPh); const pulse=Math.pow(0.5+0.5*pc,6)-0.25;
+          this.propLp+=(pulse-this.propLp)*this.kProp;
+          common+=this.propLp*P.gain*(0.35+0.65*rN)*(0.6+0.6*lp)*3;
+        }
+        if(c.wind){ this.windLp+=(this.rnd()-this.windLp)*this.kWind; common+=this.windLp*c.wind*Math.min(1,this.speed/120)*3; }
+        // larvband
+        if(c.tracks && spdMs>0.3){
+          this.trackPh+=spdMs/0.184/sr*0.5;
+          if(this.trackPh>=1){ this.trackPh-=1; this.trackEnv=Math.min(1,0.2+spdMs/12)*(0.6+0.4*(this.rnd()*0.5+0.5)); }
+          const ex=this.rnd()*this.trackEnv;
+          common+=(run(this.trackBp1,ex)*1.2+run(this.trackBp2,ex)*0.6+run(this.trackLow,ex)*1.5)*c.tracks;
+          this.trackEnv*=this.dTrack;
+        }
+        outL+=common; outR+=common;
+        // ton (last-/varvberoende lågpass) + mättnad + DC-spärr
+        const ch=[outL,outR];
+        for(let s=0;s<2;s++){
+          let v=ch[s];
+          this.lp1[s]+=(v-this.lp1[s])*kLP; this.lp2[s]+=(this.lp1[s]-this.lp2[s])*kLP;
+          v=this.lp2[s]*0.8+this.lp1[s]*0.2;
+          v=Math.tanh(v*drive*0.9)/Math.sqrt(drive);
+          const y=v-this.dcx[s]+0.997*this.dcy[s]; this.dcx[s]=v; this.dcy[s]=y;
+          ch[s]=Math.tanh(y*lvl*c.gain)*this.fade;
+        }
+        L[i]=ch[0]; R[i]=ch[1];
+      }
+    }
+  }
+  return EngineDSP;
+}
+/*DSP-END*/
+
+/* ===================== Ljudmotor (AudioWorklet med ScriptProcessor som reserv) ===================== */
+const Audio = {
+  ctx:null, node:null, gain:null, dsp:null, ready:false,
+  async init(){
+    const AC = window.AudioContext||window.webkitAudioContext;
+    if(!AC) throw new Error('Web Audio stöds inte');
+    this.ctx = new AC({latencyHint:'playback'});
+    this.gain = this.ctx.createGain(); this.gain.gain.value=0;
+    const comp = this.ctx.createDynamicsCompressor();
+    comp.threshold.value=-10; comp.knee.value=8; comp.ratio.value=4; comp.attack.value=0.003; comp.release.value=0.15;
+    this.gain.connect(comp); comp.connect(this.ctx.destination);
+    let usedWorklet=false;
+    if(this.ctx.audioWorklet && window.Blob && window.URL){
+      try{
+        const src = 'const EngineDSP=('+dspFactory.toString()+')();\n'+
+          'class EP extends AudioWorkletProcessor{constructor(){super();this.d=new EngineDSP(sampleRate);'+
+          'this.port.onmessage=e=>{const m=e.data;if(m.cfg)this.d.setConfig(m.cfg);if(m.p)this.d.setParams(m.p);};}'+
+          'process(i,o){const out=o[0];const L=out[0],R=out[1]||out[0];this.d.process(L,R,L.length);return true;}}'+
+          'registerProcessor("engine-proc",EP);';
+        const url = URL.createObjectURL(new Blob([src],{type:'application/javascript'}));
+        await this.ctx.audioWorklet.addModule(url);
+        this.node = new AudioWorkletNode(this.ctx,'engine-proc',{numberOfInputs:0,numberOfOutputs:1,outputChannelCount:[2]});
+        usedWorklet=true;
+      }catch(e){ console.warn('AudioWorklet misslyckades, använder reserv', e); }
+    }
+    if(!usedWorklet){
+      const EngineDSP = dspFactory();
+      this.dsp = new EngineDSP(this.ctx.sampleRate);
+      this.node = this.ctx.createScriptProcessor(2048,0,2);
+      this.node.onaudioprocess = e=>{ const b=e.outputBuffer; this.dsp.process(b.getChannelData(0),b.getChannelData(1),b.length); };
+    }
+    this.node.connect(this.gain);
+    this.mode = usedWorklet?'AudioWorklet':'ScriptProcessor';
+    this.ready=true;
+  },
+  send(msg){ if(!this.ready)return; if(this.dsp){ if(msg.cfg)this.dsp.setConfig(msg.cfg); if(msg.p)this.dsp.setParams(msg.p);} else this.node.port.postMessage(msg); },
+  setVolume(v){ if(!this.ctx)return; const g=Math.pow(v/100,2)*1.0; this.gain.gain.setTargetAtTime(g,this.ctx.currentTime,0.05); }
+};
+
+/* ===================== Hastighet: GPS och demoläge ===================== */
+const Speed = {
+  watchId:null, last:null, fixV:0, fixA:0, fixT:0, hasFix:false, status:'off', acc:null,
+  start(){
+    if(!window.isSecureContext && location.hostname!=='localhost' && location.hostname!=='127.0.0.1'){
+      setGps('err','GPS: kräver HTTPS');
+      showMsg('Platstjänster (GPS) fungerar bara när sidan öppnas via en säker https-adress. Använd Demoläge för att testa.');
+      return;
+    }
+    if(!('geolocation' in navigator)){ setGps('err','GPS: saknas'); showMsg('Den här webbläsaren ger inte tillgång till position. Använd Demoläge för att testa ljuden.'); return; }
+    if(this.watchId!=null) return;
+    setGps('warn','GPS: söker…');
+    const opt={enableHighAccuracy:true, maximumAge:0, timeout:15000};
+    this.watchId=-1; this.gotOne=false;
+    // Äldre Tesla-webbläsare nekade watchPosition utan att fråga – därför först en engångsfråga
+    // (visar behörighetsdialogen) och sedan kontinuerlig bevakning. Om bevakning nekas trots att
+    // engångsfrågan fungerade, används polling med getCurrentPosition varje sekund.
+    navigator.geolocation.getCurrentPosition(p=>{ this.gotOne=true; if(this.watchId===-1) this.beginWatch(opt); this.onPos(p); },
+      e=>{ if(e.code===1){ this.onErr(e); } else if(this.watchId===-1) this.beginWatch(opt); }, opt);
+  },
+  beginWatch(opt){
+    if(this.watchId!==-1) return;
+    this.watchId = navigator.geolocation.watchPosition(p=>{ this.gotOne=true; this.onPos(p); }, e=>{
+      if(e.code===1 && this.gotOne){ this.startPolling(opt); } else this.onErr(e);
+    }, opt);
+  },
+  startPolling(opt){
+    if(this.pollId) return;
+    if(this.watchId!=null && this.watchId>=0) navigator.geolocation.clearWatch(this.watchId);
+    this.watchId=-2;
+    this.pollId=setInterval(()=>navigator.geolocation.getCurrentPosition(p=>this.onPos(p),()=>{},{enableHighAccuracy:true,maximumAge:0,timeout:2500}),1000);
+  },
+  stop(){ if(this.watchId!=null && this.watchId>=0) navigator.geolocation.clearWatch(this.watchId); this.watchId=null;
+    if(this.pollId){ clearInterval(this.pollId); this.pollId=null; } setGps('','GPS: av'); },
+  onPos(p){
+    const t=(p.timestamp||Date.now())/1000, c=p.coords; let v=null;
+    if(c.speed!=null && !isNaN(c.speed) && c.speed>=0) v=c.speed*3.6;
+    else if(this.last){
+      const dt=t-this.last.t;
+      if(dt>=0.5){
+        const d=haversine(this.last.lat,this.last.lon,c.latitude,c.longitude);
+        const accOk=(c.accuracy||99)<40;
+        v = accOk ? d/dt*3.6 : null;
+        if(v!=null && d < (c.accuracy||10)*0.5 && dt<3) v = v*0.5; // brus vid stillastående
+      }
+    }
+    if(!this.last || t-this.last.t>=0.5) this.last={t,lat:c.latitude,lon:c.longitude};
+    this.acc=c.accuracy;
+    if(v==null){ if(!this.hasFix) setGps('warn','GPS: ±'+Math.round(c.accuracy||0)+' m, väntar på fart'); return; }
+    if(v<1.2) v=0;
+    const now=performance.now()/1000;
+    if(this.hasFix){
+      const dt=Math.max(0.2,now-this.fixT);
+      let a=(v-this.fixV)/dt; a=Math.max(-25,Math.min(18,a)); // km/h/s, rimlighetsgräns
+      v=this.fixV+a*dt;
+      this.fixA=this.fixA*0.4+a*0.6;
+    }
+    this.fixV=v; this.fixT=now; this.hasFix=true;
+    setGps('ok','GPS: ±'+Math.round(c.accuracy||0)+' m');
+  },
+  onErr(e){
+    if(e.code===1){
+      setGps('err','GPS: nekad');
+      showMsg('Platsåtkomst nekades. Motorljudet kan inte följa bilens fart utan GPS. Tillåt plats för den här sidan i webbläsaren (adressfältets lås/inställningar) och ladda om – eller använd Demoläge.');
+      this.stop(); setGps('err','GPS: nekad');
+    }else if(e.code===2){ setGps('warn','GPS: ingen position'); }
+    else { setGps('warn','GPS: väntar…'); }
+  },
+  // uppskattad fart just nu (linjär framskrivning mellan GPS-punkter, max 1,5 s)
+  estimate(){
+    if(!this.hasFix) return {v:0,a:0};
+    const age=performance.now()/1000-this.fixT;
+    const ex=Math.min(age,1.5);
+    let v=this.fixV+this.fixA*ex; if(age>4){ v=this.fixV; }
+    return {v:Math.max(0,v), a: age>2.5?0:this.fixA};
+  }
+};
+function haversine(la1,lo1,la2,lo2){
+  const R=6371000, r=Math.PI/180, dLa=(la2-la1)*r, dLo=(lo2-lo1)*r;
+  const a=Math.sin(dLa/2)**2+Math.cos(la1*r)*Math.cos(la2*r)*Math.sin(dLo/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+
+const Demo = {
+  on:false, target:0, v:0, a:0, trip:null,
+  step(dt){
+    if(this.trip){ const t=(performance.now()-this.trip.t0)/1000; const tv=tripProfile(t); if(tv<0){ this.trip=null; setTripBtn(false);} else { this.target=tv; ui.demoSpd.value=Math.round(tv); ui.demoV.textContent=Math.round(tv)+' km/h'; } }
+    const diff=this.target-this.v;
+    const up=Math.min(13, 3+Math.abs(diff)*0.35), dn=Math.min(22, 4+Math.abs(diff)*0.5);
+    const dv=Math.max(-dn*dt,Math.min(up*dt,diff));
+    this.v=Math.max(0,this.v+dv);
+    const a=dv/Math.max(dt,1e-3);
+    this.a+= (a-this.a)*Math.min(1,dt/0.25);
+    return {v:this.v,a:this.a};
+  }
+};
+// testrunda: [tid s, km/h]
+const TRIP=[[0,0],[3,0],[14,70],[20,70],[24,45],[34,110],[44,110],[52,30],[56,30],[63,0],[68,0]];
+function tripProfile(t){
+  if(t>=TRIP[TRIP.length-1][0]) return -1;
+  for(let i=1;i<TRIP.length;i++){ if(t<=TRIP[i][0]){ const [t0,v0]=TRIP[i-1],[t1,v1]=TRIP[i]; return v0+(v1-v0)*(t-t0)/(t1-t0);} }
+  return -1;
+}
+
+/* ===================== Drivlina: växellåda och varvtal ===================== */
+const Sim = {
+  E:null, v:0, a:0, gear:0, rpm:0, rpmT:0, load:0, shiftUntil:0, lastShift:-9, shiftKind:'', disp:0, limT:0,
+  setEngine(E){ this.E=E; this.gear=0; this.rpm=E.idle; this.rpmT=E.idle; this.disp=E.idle; this.lastShift=-9; this.shiftUntil=0; },
+  step(dt, src, now){
+    const E=this.E;
+    this.v += (src.v-this.v)*Math.min(1,dt/0.35);
+    this.a += (src.a-this.a)*Math.min(1,dt/0.4);
+    const v=this.v, a=this.a;
+    const stopped = v<1.0;
+    let load = 0.1 + 0.25*Math.min(1,v/150) + a/E.aRef;
+    if(stopped && Math.abs(a)<1) load = 0;
+    load=Math.max(-1,Math.min(1,load));
+    let rpmT, gearLbl;
+    if(E.mode==='prop'){
+      const s=Math.min(1,v/50), ss=s*s*(3-2*s);
+      rpmT=E.idle+(E.cruise-E.idle)*ss+250*Math.max(0,Math.min(1,(v-50)/100))+180*Math.max(0,load)-150*Math.max(0,-load)*ss;
+      rpmT=Math.min(E.redline,Math.max(E.idle,rpmT));
+      gearLbl = stopped?'—':(load>0.5?'Full':(load<-0.2?'Glid':'Fart'));
+    }else{
+      const G=E.gears, n=G.length, r=g=>v/G[g]*1000;
+      if(now>this.shiftUntil){
+        const lp=Math.max(0,Math.min(1,load));
+        const up=E.upCruise+(E.upFull-E.upCruise)*Math.pow(lp,1.2);
+        let g=this.gear;
+        if(stopped || v<3){ g=0; }
+        else if(g<n-1 && r(g)>up && r(g+1)>E.down*1.12 && (a>-1.5 || r(g)>E.upFull) && now-this.lastShift>0.7){ g++; } // ingen uppväxling vid inbromsning
+        else if(g>0 && (r(g)<E.down ||
+                 (load>0.7 && r(g-1)<E.upFull*0.85 && now-this.lastShift>1.5) ||
+                 (load<-0.35 && r(g-1)<E.upCruise*0.95 && now-this.lastShift>1.2))){ g--; }
+        if(g!==this.gear){
+          this.shiftKind = g>this.gear?'up':'down';
+          if(!(v<3)) { this.shiftUntil=now+(this.shiftKind==='up'?E.shiftTime:Math.min(E.shiftTime,0.25)); this.lastShift=now; }
+          this.gear=g;
+        }
+      }
+      let wheel=r(this.gear);
+      rpmT=Math.max(E.idle,wheel);
+      if(this.gear===0 && v>0.3 && wheel<E.launch && load>0.05){
+        rpmT=Math.max(wheel,E.idle+(E.launch-E.idle)*Math.min(1,load*1.6));
+      }
+      if(now<this.shiftUntil){
+        if(this.shiftKind==='up') load=-0.25; else load=0.45; // gaslyft vid uppväxling, mellangas vid nedväxling
+        if(this.shiftKind==='down') rpmT*=1.06;
+      }
+      if(rpmT>E.redline){ // varvbegränsare
+        this.limT+=dt; const cut=(Math.floor(this.limT*9)%2)===0;
+        rpmT=E.redline-(cut?E.redline*0.03:0); if(cut) load=-0.3;
+      }
+      gearLbl = stopped ? 'N' : String(this.gear+1);
+    }
+    if(stopped){ rpmT=E.idle*(1+0.012*Math.sin(now*1.7)+0.006*Math.sin(now*4.3)); }
+    this.rpmT=rpmT; this.load=load;
+    this.disp+= (rpmT-this.disp)*Math.min(1,dt/Math.max(0.05,E.inertia));
+    return {rpm:rpmT, load, speed:v, gearLbl};
+  }
+};
+
+/* ===================== Gränssnitt ===================== */
+const $=id=>document.getElementById(id);
+const ui={ tach:$('tach'), spd:$('spd'), gear:$('gear'), gearLbl:$('gearLbl'), rpm:$('rpm'), engines:$('engines'), startBtn:$('startBtn'),
+  vol:$('vol'), volV:$('volV'), demoSpd:$('demoSpd'), demoV:$('demoV'), demoBtn:$('demoBtn'), tripBtn:$('tripBtn'), msg:$('msg'), engTitle:$('engTitle') };
+let running=false, engineId=localStorage.getItem('motorljud.engine')||'v8';
+if(!ENGINES[engineId]) engineId='v8';
+
+function setDot(id,cls){ const d=$(id); d.className='dot'+(cls?' '+cls:''); }
+function setGps(cls,txt){ setDot('dGps',cls); $('tGps').textContent=txt; }
+function showMsg(t,info){ ui.msg.className=info?'info':''; ui.msg.innerHTML=''; const p=document.createElement('div'); p.textContent=t; ui.msg.appendChild(p);
+  const b=document.createElement('button'); b.className='btn'; b.textContent='OK'; b.onclick=()=>ui.msg.style.display='none'; ui.msg.appendChild(b); ui.msg.style.display='block'; }
+
+function buildEngines(){
+  ui.engines.innerHTML='';
+  Object.values(ENGINES).forEach((E,i,arr)=>{
+    const b=document.createElement('button'); b.className='eng'+(E.id===engineId?' sel':'')+(i===arr.length-1&&arr.length%2?' wide':'');
+    b.innerHTML='<b></b><small></small>'; b.querySelector('b').textContent=E.name; b.querySelector('small').textContent=E.desc;
+    b.onclick=()=>selectEngine(E.id); b.dataset.id=E.id; ui.engines.appendChild(b);
+  });
+}
+function selectEngine(id){
+  engineId=id; localStorage.setItem('motorljud.engine',id);
+  [...ui.engines.children].forEach(b=>b.classList.toggle('sel',b.dataset.id===id));
+  const E=ENGINES[id]; ui.engTitle.textContent='· '+E.name; ui.gearLbl.textContent=E.mode==='prop'?'Läge':'Växel';
+  Sim.setEngine(E); tach.setup(E);
+  if(Audio.ready){
+    // kort övertoning vid motorbyte
+    const t=Audio.ctx.currentTime; Audio.gain.gain.cancelScheduledValues(t); Audio.gain.gain.setTargetAtTime(0,t,0.04);
+    setTimeout(()=>{ Audio.send({cfg:E, p:{rpm:E.idle,load:0,on:running}}); Audio.setVolume(+ui.vol.value); },160);
+  }
+}
+
+/* --- varvräknare --- */
+const tach={
+  E:null, max:0, step:0, div:1000,
+  setup(E){ this.E=E;
+    const steps=[50,100,200,250,500,1000]; const top=E.redline*1.1;
+    this.step=steps.find(s=>top/s<=11)||1000; this.max=Math.ceil(top/this.step)*this.step;
+    this.div = this.max>=5000?1000:100; this.resize(); },
+  resize(){ const c=ui.tach, r=c.parentElement.getBoundingClientRect(), d=window.devicePixelRatio||1;
+    c.width=Math.max(10,(r.width-20)*d); c.height=Math.max(10,(r.height-20)*d); c.style.width=(r.width-20)+'px'; c.style.height=(r.height-20)+'px'; },
+  draw(rpm,gear,load){
+    const c=ui.tach, g=c.getContext('2d'), W=c.width, H=c.height, E=this.E; if(!E)return;
+    g.clearRect(0,0,W,H);
+    const cx=W/2, cy=H*0.54, R=Math.min(W*0.46,H*0.47);
+    const a0=Math.PI*0.75, a1=Math.PI*2.25, ang=v=>a0+(a1-a0)*Math.min(1.02,v/this.max);
+    g.lineCap='round';
+    g.lineWidth=R*0.075; g.strokeStyle='#262a30'; g.beginPath(); g.arc(cx,cy,R*0.9,a0,a1); g.stroke();
+    g.strokeStyle='#5a1518'; g.beginPath(); g.arc(cx,cy,R*0.9,ang(E.redline),a1); g.stroke();
+    const grad=g.createLinearGradient(cx-R,0,cx+R,0); grad.addColorStop(0,'#2f55c9'); grad.addColorStop(1,'#6f95ff');
+    g.strokeStyle= rpm>E.redline*0.97?'#e82127':grad; g.beginPath(); g.arc(cx,cy,R*0.9,a0,ang(rpm)); g.stroke();
+    // skala
+    g.fillStyle='#c9ced6'; g.textAlign='center'; g.textBaseline='middle'; g.font=Math.round(R*0.085)+'px Helvetica, Arial, sans-serif';
+    const minor=this.step/2;
+    for(let v=0; v<=this.max+1; v+=minor){
+      const A=ang(v), major=Math.abs(v/this.step-Math.round(v/this.step))<1e-6;
+      const r1=R*0.78, r2=major?R*0.68:R*0.73;
+      g.strokeStyle=v>=E.redline?'#e82127':(major?'#d8dce2':'#5c626b'); g.lineWidth=major?R*0.018:R*0.01;
+      g.beginPath(); g.moveTo(cx+Math.cos(A)*r1,cy+Math.sin(A)*r1); g.lineTo(cx+Math.cos(A)*r2,cy+Math.sin(A)*r2); g.stroke();
+      if(major){ const t=v/this.div; g.fillStyle=v>=E.redline?'#ff6b6f':'#c9ced6';
+        g.fillText(Number.isInteger(t)?String(t):t.toFixed(1),cx+Math.cos(A)*R*0.57,cy+Math.sin(A)*R*0.57); }
+    }
+    // nål
+    const A=ang(rpm);
+    g.strokeStyle='#ff3b40'; g.lineWidth=R*0.022; g.beginPath(); g.moveTo(cx-Math.cos(A)*R*0.08,cy-Math.sin(A)*R*0.08); g.lineTo(cx+Math.cos(A)*R*0.82,cy+Math.sin(A)*R*0.82); g.stroke();
+    g.fillStyle='#1b1e22'; g.beginPath(); g.arc(cx,cy,R*0.3,0,Math.PI*2); g.fill();
+    g.strokeStyle='#30353c'; g.lineWidth=R*0.012; g.stroke();
+    g.fillStyle='#fff'; g.font='600 '+Math.round(R*0.3)+'px Helvetica, Arial, sans-serif'; g.fillText(gear,cx,cy+R*0.01);
+    g.fillStyle='#8d939b'; g.font=Math.round(R*0.065)+'px Helvetica, Arial, sans-serif';
+    g.fillText('×'+this.div+' r/min',cx,cy+R*0.42);
+    // lastindikator
+    const lw=R*0.9, lx=cx-lw/2, ly=cy+R*0.62, lh=R*0.045;
+    g.fillStyle='#262a30'; g.fillRect(lx,ly,lw,lh);
+    g.fillStyle=load>=0?'#33c26b':'#f0a020';
+    const l=Math.max(-1,Math.min(1,load)); if(l>=0) g.fillRect(cx,ly,lw/2*l,lh); else g.fillRect(cx+lw/2*l,ly,-lw/2*l,lh);
+    g.fillStyle='#8d939b'; g.fillText(l>=0?'Gas':'Motorbroms',cx,ly+lh+R*0.07);
+  }
+};
+
+/* --- skärmlås (Wake Lock) --- */
+let wakeLock=null;
+async function keepAwake(){
+  try{ if('wakeLock' in navigator && document.visibilityState==='visible'){ wakeLock=await navigator.wakeLock.request('screen');
+      setDot('dWake','ok'); $('tWake').textContent='Skärm: hålls vaken'; wakeLock.addEventListener('release',()=>{ if(running){ setDot('dWake','warn'); $('tWake').textContent='Skärm: normal'; } }); }
+    else { $('tWake').textContent='Skärm: normal'; } }catch(e){ /* tyst */ }
+}
+document.addEventListener('visibilitychange',()=>{ if(running && document.visibilityState==='visible'){ keepAwake(); if(Audio.ctx&&Audio.ctx.state!=='running')Audio.ctx.resume(); } });
+
+/* --- start/stopp --- */
+async function start(){
+  try{
+    if(!Audio.ready) await Audio.init();
+    await Audio.ctx.resume();
+  }catch(e){ showMsg('Kunde inte starta ljudet: '+e.message); return; }
+  const E=ENGINES[engineId];
+  Audio.send({cfg:E, p:{rpm:E.idle,load:0,on:true}}); Audio.setVolume(+ui.vol.value);
+  running=true; ui.startBtn.textContent='Stäng av'; ui.startBtn.classList.add('on');
+  setDot('dAud','ok'); $('tAud').textContent='Ljud: på';
+  keepAwake();
+  if(!Demo.on) Speed.start();
+}
+function stop(){
+  running=false; Audio.send({p:{on:false}}); if(Audio.ctx) setTimeout(()=>{ if(!running && Audio.ctx) Audio.ctx.suspend(); },600);
+  ui.startBtn.textContent='Starta motorn'; ui.startBtn.classList.remove('on');
+  setDot('dAud',''); $('tAud').textContent='Ljud: av';
+  if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; } setDot('dWake',''); $('tWake').textContent='Skärm: normal';
+}
+ui.startBtn.onclick=()=>running?stop():start();
+ui.vol.oninput=()=>{ ui.volV.textContent=ui.vol.value+' %'; Audio.setVolume(+ui.vol.value); localStorage.setItem('motorljud.vol',ui.vol.value); };
+ui.demoSpd.oninput=()=>{ Demo.trip=null; setTripBtn(false); Demo.target=+ui.demoSpd.value; ui.demoV.textContent=ui.demoSpd.value+' km/h'; };
+function setDemo(on){
+  Demo.on=on; ui.demoBtn.classList.toggle('on',on); ui.demoBtn.textContent='Demoläge: '+(on?'på':'av');
+  ui.demoSpd.disabled=!on; ui.tripBtn.disabled=!on;
+  if(on){ Speed.stop(); setGps('', 'GPS: demoläge'); Demo.v=Sim.v; Demo.target=+ui.demoSpd.value; }
+  else { Demo.trip=null; setTripBtn(false); if(running) Speed.start(); else setGps('','GPS: av'); }
+}
+function setTripBtn(on){ ui.tripBtn.textContent=on?'Avbryt testrunda':'Kör testrunda'; ui.tripBtn.classList.toggle('on',on); }
+ui.demoBtn.onclick=()=>setDemo(!Demo.on);
+ui.tripBtn.onclick=()=>{ if(Demo.trip){ Demo.trip=null; setTripBtn(false); } else { Demo.trip={t0:performance.now()}; setTripBtn(true); if(!running) start(); } };
+
+/* --- huvudslinga (setInterval så den fortsätter även om rAF stryps) --- */
+let lastT=performance.now(), lastSend=0;
+function tick(){
+  const nowMs=performance.now(), dt=Math.min(0.1,(nowMs-lastT)/1000); lastT=nowMs; const now=nowMs/1000;
+  const src = Demo.on ? Demo.step(dt) : (running ? Speed.estimate() : {v:0,a:0});
+  const out = Sim.step(dt, src, now);
+  if(running && nowMs-lastSend>25){ Audio.send({p:{rpm:out.rpm,load:out.load,speed:out.speed}}); lastSend=nowMs; }
+  window.__state={v:Sim.v,rpm:Sim.disp,rpmT:out.rpm,gear:out.gearLbl,load:out.load,engine:engineId,audio:Audio.mode||null,running};
+  return out;
+}
+function render(out){
+  ui.spd.textContent=Math.round(Sim.v);
+  ui.gear.textContent=out.gearLbl;
+  ui.rpm.textContent=(Math.round(Sim.disp/10)*10).toLocaleString('sv-SE');
+  tach.draw(Sim.disp,out.gearLbl,Sim.load);
+}
+let lastOut={gearLbl:'N'};
+setInterval(()=>{ lastOut=tick(); },20);
+(function frame(){ render(lastOut); requestAnimationFrame(frame); })();
+window.addEventListener('resize',()=>tach.resize());
+
+// init
+const savedVol=localStorage.getItem('motorljud.vol'); if(savedVol!=null){ ui.vol.value=savedVol; ui.volV.textContent=savedVol+' %'; }
+buildEngines(); selectEngine(engineId);
+if(!window.isSecureContext) setGps('warn','GPS: kräver HTTPS');
+</script>
+</body>
+</html>
