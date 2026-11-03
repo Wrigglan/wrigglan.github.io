@@ -59,6 +59,9 @@
   input[type=range]::-moz-range-track{height:12px;border-radius:6px;background:#33373e}
   input[type=range]::-moz-range-thumb{width:40px;height:40px;border-radius:50%;background:#fff;border:0}
   input[type=range]:disabled{opacity:.35}
+  input[type=range]{touch-action:none}
+  .vbtn{flex:0 0 auto;width:clamp(48px,4.5vw,80px);height:clamp(48px,4.5vw,80px);border-radius:14px;border:0;background:#33373e;color:#fff;font-size:clamp(26px,2.6vw,44px);font-weight:700;line-height:1;cursor:pointer;touch-action:manipulation}
+  .vbtn:active{background:#4a4f58}
   .side{display:flex;flex-direction:column;gap:1vh}
   .side .btn{flex:1;min-height:0}
   #msg{position:fixed;left:50%;top:12vh;transform:translateX(-50%);max-width:70vw;background:#2a1a1a;border:1px solid var(--red);
@@ -94,7 +97,7 @@
   <footer>
     <button class="btn start" id="startBtn">Starta motorn</button>
     <div class="rows">
-      <div class="ctrl"><label for="vol">Volym</label><input type="range" id="vol" min="0" max="100" value="70"><span class="val" id="volV">70 %</span></div>
+      <div class="ctrl"><label for="vol">Volym</label><button type="button" class="vbtn" id="volDown" aria-label="Sänk volymen">−</button><input type="range" id="vol" min="0" max="100" step="5" value="70"><button type="button" class="vbtn" id="volUp" aria-label="Höj volymen">+</button><span class="val" id="volV">70 %</span></div>
       <div class="ctrl"><label for="demoSpd">Demofart</label><input type="range" id="demoSpd" min="0" max="160" value="0" disabled><span class="val" id="demoV">0 km/h</span></div>
     </div>
     <div class="side">
@@ -391,7 +394,7 @@ const Audio = {
     this.ready=true;
   },
   send(msg){ if(!this.ready)return; if(this.dsp){ if(msg.cfg)this.dsp.setConfig(msg.cfg); if(msg.p)this.dsp.setParams(msg.p);} else this.node.port.postMessage(msg); },
-  setVolume(v){ if(!this.ctx)return; const g=Math.pow(v/100,2)*1.0; this.gain.gain.setTargetAtTime(g,this.ctx.currentTime,0.05); }
+  setVolume(v){ if(!this.ctx||!this.gain)return; const g=Math.pow(Math.max(0,Math.min(100,v))/100,2); const p=this.gain.gain, t=this.ctx.currentTime; try{ p.cancelScheduledValues(t); p.setValueAtTime(p.value,t); p.linearRampToValueAtTime(g,t+0.06);}catch(e){ p.value=g; } }
 };
 
 /* ===================== Hastighet: GPS och demoläge ===================== */
@@ -664,7 +667,11 @@ function stop(){
   if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; } setDot('dWake',''); $('tWake').textContent='Skärm: normal';
 }
 ui.startBtn.onclick=()=>running?stop():start();
-ui.vol.oninput=()=>{ ui.volV.textContent=ui.vol.value+' %'; Audio.setVolume(+ui.vol.value); localStorage.setItem('motorljud.vol',ui.vol.value); };
+function applyVol(v){ v=Math.max(0,Math.min(100,Math.round(+v))); ui.vol.value=v; ui.volV.textContent=v+' %'; Audio.setVolume(v); try{localStorage.setItem('motorljud.vol',String(v));}catch(e){} }
+ui.vol.addEventListener('input',()=>applyVol(ui.vol.value));
+ui.vol.addEventListener('change',()=>applyVol(ui.vol.value));
+document.getElementById('volDown').addEventListener('click',()=>applyVol(+ui.vol.value-10));
+document.getElementById('volUp').addEventListener('click',()=>applyVol(+ui.vol.value+10));
 ui.demoSpd.oninput=()=>{ Demo.trip=null; setTripBtn(false); Demo.target=+ui.demoSpd.value; ui.demoV.textContent=ui.demoSpd.value+' km/h'; };
 function setDemo(on){
   Demo.on=on; ui.demoBtn.classList.toggle('on',on); ui.demoBtn.textContent='Demoläge: '+(on?'på':'av');
