@@ -69,6 +69,48 @@
   #msg.info{background:#1a2238;border-color:var(--acc2);color:#dfe7ff}
   #msg button{margin-top:.8em}
   .credit{color:#5d636b;font-size:clamp(10px,.75vw,15px);text-align:center;margin-top:.4vh}
+
+  /* ===== Mobil i liggande läge ===== */
+  @supports (height:100dvh){ .app{height:100dvh} }
+  @media (orientation:landscape) and (max-height:540px){
+    .app{padding:6px max(8px,env(safe-area-inset-right)) 6px max(8px,env(safe-area-inset-left));gap:6px}
+    h1{font-size:16px}
+    .chips{gap:4px}
+    .chip{font-size:10px;padding:3px 7px}
+    main{grid-template-columns:0.9fr 1.25fr;gap:8px}
+    .card{border-radius:12px}
+    .gauge{padding:2px}
+    .right{gap:6px}
+    .readout{padding:6px 10px;gap:6px}
+    .big{font-size:clamp(30px,11vh,56px)}
+    .mid{font-size:clamp(20px,7vh,36px)}
+    .lbl{font-size:10px;margin-top:2px}
+    .engines{grid-template-columns:repeat(3,1fr);gap:5px;padding:6px}
+    .eng.wide{grid-column:auto}
+    .eng{padding:4px 8px;border-radius:10px;border-width:2px}
+    .eng b{font-size:clamp(12px,3.6vh,16px)}
+    .eng small{display:none}
+    footer{grid-template-columns:auto 1fr auto;gap:6px}
+    .btn{font-size:13px;padding:0 10px;min-height:0;border-radius:10px}
+    .btn.start{min-width:110px;font-size:15px}
+    .rows{gap:4px}
+    .ctrl{gap:6px;padding:0 8px;border-radius:10px}
+    .ctrl label{font-size:11px;min-width:4em}
+    .ctrl .val{font-size:12px;min-width:3.4em}
+    input[type=range]{height:30px}
+    input[type=range]::-webkit-slider-thumb{width:24px;height:24px;margin-top:-6px}
+    .vbtn{width:34px;height:30px;font-size:20px;border-radius:8px}
+    .side{gap:4px}
+    .credit{display:none}
+    #msg{top:4vh;max-width:90vw;font-size:13px;padding:.8em 1em}
+  }
+  /* Mobil i stående läge: be användaren vrida */
+  #rotate{display:none}
+  @media (orientation:portrait) and (max-width:600px){
+    #rotate{display:flex;position:fixed;inset:0;z-index:20;background:var(--bg);color:var(--txt);align-items:center;justify-content:center;
+      flex-direction:column;gap:14px;text-align:center;padding:24px;font-size:18px}
+    #rotate .ico{font-size:56px}
+  }
 </style>
 </head>
 <body>
@@ -108,6 +150,7 @@
   <div class="credit">Alla ljud syntetiseras i realtid med Web Audio – inga inspelade ljudfiler. Ljudet är en simulering och följer GPS-hastigheten. Ha alltid fokus på trafiken.</div>
 </div>
 <div id="msg"></div>
+<div id="rotate"><div class="ico">📱↻</div><div>Vrid mobilen till liggande läge</div></div>
 
 <script>
 "use strict";
