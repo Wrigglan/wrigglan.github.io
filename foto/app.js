@@ -337,13 +337,29 @@ function copyText(t){
 function fallbackCopy(t, done){ const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select();
   try { document.execCommand('copy'); done(); } catch(e){ showMsg('Kopiera för hand: ' + esc(t), 'info', 6000); } ta.remove(); }
 
+/* OSM-kartrutor: måste skicka Referer (OSM:s policy). Sidan blockerar annars Referer för Google-rösten,
+   så vi slår på den per kartlager. Vid upprepade fel byts till CARTO som reserv. */
+function addBaseMap(map){
+  const OSM = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, referrerPolicy: 'strict-origin-when-cross-origin',
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-bidragsgivare'});
+  const CARTO = () => L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {maxZoom: 19, subdomains: 'abcd', referrerPolicy: 'strict-origin-when-cross-origin',
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-bidragsgivare © <a href="https://carto.com/attributions">CARTO</a>'});
+  let ok = 0, bad = 0, switched = false;
+  OSM.on('tileload', () => { ok++; });
+  OSM.on('tileerror', () => { bad++;
+    if (!switched && bad >= 4 && ok === 0){ switched = true; map.removeLayer(OSM); CARTO().addTo(map); window.__mapProvider = 'carto'; }
+  });
+  window.__mapProvider = 'osm';
+  OSM.addTo(map); return OSM;
+}
+
 /* ---------- Karta ---------- */
 let map = null, carMk = null, layer = null, follow = true;
 function initMap(){
   if (!window.L){ $('mapmsg').textContent = 'Kartan kunde inte laddas (ingen uppkoppling?). Listan fungerar ändå.'; return; }
   try {
     map = L.map('map', {zoomControl: false, attributionControl: true}).setView([58.07, 11.82], 11);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 18, subdomains: 'abc', attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
+    addBaseMap(map);
     layer = L.layerGroup().addTo(map); $('mapmsg').style.display = 'none';
     map.on('dragstart', () => { follow = false; });
   } catch(e){ map = null; $('mapmsg').textContent = 'Kartan kunde inte startas.'; }
