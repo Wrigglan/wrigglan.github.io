@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#050505">
+<meta name="description" content="Fansida: en K.I.T.T.-inspirerad instrumentpanel med lokal svensk röst – för Teslans webbläsare.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23000'/%3E%3Crect x='2' y='5' width='3' height='6' fill='%23f22'/%3E%3Crect x='6.5' y='2' width='3' height='12' fill='%23f22'/%3E%3Crect x='11' y='5' width='3' height='6' fill='%23f22'/%3E%3C/svg%3E">
+<title>K.I.T.T. – Skirnirs instrumentpanel</title>
+<link rel="stylesheet" href="css/kitt.css">
+</head>
+<body class="mode-normal">
+<div id="app">
+  <header class="top">
+    <div class="brand"><b>K.I.T.T.</b><span>SKIRNIR · FORDONSINTELLIGENS</span></div>
+    <div class="chips">
+      <div class="chip" id="cVoice"><i class="dot"></i><span>RÖSTMODUL: VILAR</span></div>
+      <div class="chip" id="cGps"><i class="dot"></i><span>GPS: AV</span></div>
+      <div class="chip" id="cWake"><i class="dot"></i><span>SKÄRM</span></div>
+      <div class="chip clock" id="cClock">--:--</div>
+    </div>
+  </header>
+
+  <main class="dash">
+    <!-- VÄNSTER: hastighet + mätare -->
+    <section class="panel left">
+      <div class="speedo">
+        <div class="lbl">HASTIGHET</div>
+        <svg id="spd" viewBox="0 0 186 100" aria-label="Hastighet"></svg>
+        <div class="unit">KM/H</div>
+      </div>
+      <div class="hbar" id="barSpeed" aria-hidden="true"></div>
+      <div class="hscale"><span>0</span><span>50</span><span>100</span><span>150</span><span>200</span></div>
+      <div class="gauges">
+        <div class="vg"><div class="vbar" id="gEnergy"></div><span>ENERGI</span></div>
+        <div class="vg"><div class="vbar" id="gTemp"></div><span>TEMP</span></div>
+        <div class="vg"><div class="vbar" id="gSig"></div><span>SIGNAL</span></div>
+        <div class="vg"><div class="vbar" id="gVol"></div><span>VOLYM</span></div>
+      </div>
+      <div class="minigrid">
+        <button class="sq amber" data-act="crt-log"  id="bLog"><i></i>LOGG</button>
+        <button class="sq green" data-act="crt-radar" id="bRadar"><i></i>RADAR</button>
+        <button class="sq yellow" data-act="test"><i></i>TEST</button>
+        <button class="sq red" data-act="deco" data-say="eval"><i></i>EVAL</button>
+        <button class="sq green" data-act="deco" data-say="comp"><i></i>COMP</button>
+        <button class="sq amber" data-act="deco" data-say="traj"><i></i>TRAJ</button>
+      </div>
+    </section>
+
+    <!-- MITTEN: röstmodulator -->
+    <section class="panel center">
+      <div class="vmod">
+        <div class="lampcol">
+          <div class="lamp amber" data-l="air">AIR</div>
+          <div class="lamp amber" data-l="oil">OIL</div>
+          <div class="lamp red" data-l="p1">P1</div>
+          <div class="lamp red" data-l="p2">P2</div>
+        </div>
+        <div class="vbox-frame"><canvas id="vbox"></canvas></div>
+        <div class="lampcol">
+          <div class="lamp green" data-l="s1">S1</div>
+          <div class="lamp green" data-l="s2">S2</div>
+          <div class="lamp red" data-l="p3">P3</div>
+          <div class="lamp red" data-l="p4">P4</div>
+        </div>
+      </div>
+      <div class="modes">
+        <button class="mode" data-mode="normal"><i></i><b>NORMAL CRUISE</b><small>normal kryssning</small></button>
+        <button class="mode" data-mode="auto"><i></i><b>AUTO CRUISE</b><small>automatisk</small></button>
+        <button class="mode" data-mode="pursuit"><i></i><b>PURSUIT</b><small>förföljelse</small></button>
+      </div>
+    </section>
+
+    <!-- HÖGER: två CRT-skärmar -->
+    <section class="panel right">
+      <div class="crt green" id="crt1"><div class="crt-in"><div class="crt-head"><span id="crt1Title">RÖSTLOGG</span><span id="crt1Info"></span></div><div class="log" id="log"></div></div></div>
+      <div class="crt amber" id="crt2"><div class="crt-in"><div class="crt-head"><span>NAV · RADAR</span><span id="crt2Info">--</span></div><canvas id="radar"></canvas><div class="navtxt" id="navTxt"></div></div></div>
+    </section>
+  </main>
+
+  <footer class="controls">
+    <button class="big red"    data-act="turbo"><i></i><b>TURBO BOOST</b></button>
+    <button class="big amber"  data-act="silent" id="bSilent"><i></i><b>SILENT MODE</b><small>tyst läge</small></button>
+    <button class="big green"  data-act="status"><i></i><b>STATUS</b><small>läge &amp; plats</small></button>
+    <button class="big yellow" data-act="prata"><i></i><b>PRATA</b><small>säg något</small></button>
+    <button class="big amber"  data-act="quip"><i></i><b>SKÄMT</b><small>slumpreplik</small></button>
+    <button class="big green"  data-act="demo" id="bDemo"><i></i><b>DEMO</b><small>simulerad tur</small></button>
+    <div class="volbox">
+      <button class="vbtn" data-act="vol-" aria-label="Sänk volym">−</button>
+      <div class="volread"><span id="volV">7</span><small>VOLYM</small></div>
+      <button class="vbtn" data-act="vol+" aria-label="Höj volym">+</button>
+    </div>
+  </footer>
+</div>
+
+<!-- Start (första tryck låser upp ljud) -->
+<div class="overlay show" id="start">
+  <div class="startbox">
+    <div class="sb-title">K.I.T.T.</div>
+    <div class="sb-sub">Fordonsintelligens för Skirnir</div>
+    <button class="go" id="goBtn"><i></i>AKTIVERA</button>
+    <p class="sb-note">Första gången laddas en svensk neural röstmodul (ca 92 MB) som sedan sparas i webbläsaren. Rösten genereras helt lokalt i bilen. Ingen styrning av bilen – bara grafik och röst.</p>
+  </div>
+</div>
+
+<!-- Prata-panel -->
+<div class="overlay" id="prata">
+  <div class="prbox">
+    <div class="pr-head"><b>PRATA MED KITT</b><button class="sq red close" data-act="prata-close"><i></i>STÄNG</button></div>
+    <div class="presets" id="presets"></div>
+    <form class="pr-form" id="prForm" autocomplete="off">
+      <input id="prText" type="text" maxlength="400" placeholder="Skriv vad KITT ska säga …" enterkeyhint="send">
+      <button class="sq green say" type="submit"><i></i>SÄG</button>
+    </form>
+  </div>
+</div>
+
+<!-- Turbo-nedräkning -->
+<div class="overlay turbo" id="turbo"><div class="tcount" id="tCount">3</div><div class="tlabel">TURBO BOOST</div></div>
+
+<div class="toast" id="toast"></div>
+<noscript><p style="color:#f44;padding:2em">JavaScript krävs.</p></noscript>
+<script src="js/lines.js"></script>
+<script src="js/voice.js"></script>
+<script src="js/kitt.js"></script>
+</body>
+</html>
