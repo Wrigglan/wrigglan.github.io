@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#111214">
+<link rel="icon" href="data:,">
+<title>Reseguide – berättar om platserna du passerar</title>
+<style>
+  :root{
+    --bg:#0e0f11; --panel:#17191c; --panel2:#1f2226; --line:#2b2f35;
+    --txt:#f2f3f5; --dim:#9aa0a8; --acc:#3e6ae1; --acc2:#5b84ff; --red:#e82127; --ok:#33c26b; --warn:#f0a020;
+    --r:18px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+    font-family:"Gotham SSm","Gotham","Helvetica Neue",Arial,system-ui,sans-serif;overflow:hidden}
+  button{font:inherit;color:inherit}
+  a{color:var(--acc2)}
+  .app{display:grid;grid-template-rows:auto 1fr auto auto;height:100vh;padding:1.4vh 1.4vw;gap:1.3vh}
+  @supports (height:100dvh){ .app{height:100dvh} }
+  header{display:flex;align-items:center;justify-content:space-between;gap:1vw;min-width:0}
+  h1{margin:0;font-size:clamp(20px,2.2vw,42px);font-weight:600;letter-spacing:.02em;white-space:nowrap}
+  h1 span{color:var(--dim);font-weight:400}
+  .chips{display:flex;gap:.6vw;flex-wrap:nowrap;justify-content:flex-end;overflow:hidden}
+  .chip{display:flex;align-items:center;gap:.5em;background:var(--panel);border:1px solid var(--line);border-radius:999px;
+    padding:.45em 1em;font-size:clamp(12px,1vw,19px);color:var(--dim);white-space:nowrap}
+  .chip b{color:var(--txt);font-variant-numeric:tabular-nums;font-weight:600}
+  .chip.demo{border-color:var(--warn);color:var(--warn)}
+  .dot{width:.7em;height:.7em;border-radius:50%;background:#555;flex:0 0 auto}
+  .dot.ok{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.err{background:var(--red)}
+  main{display:grid;grid-template-columns:1.5fr 1fr;gap:1.4vw;min-height:0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);min-height:0;overflow:hidden}
+
+  /* Berättarkortet */
+  .story{display:grid;grid-template-rows:1fr auto;min-height:0}
+  .story-body{display:grid;grid-template-columns:auto 1fr;gap:1.4vw;padding:2vh 1.6vw 1vh;min-height:0}
+  .story-body.noimg{grid-template-columns:1fr}
+  .thumb{width:clamp(120px,17vw,320px);height:100%;max-height:100%;border-radius:14px;background:#222 center/cover no-repeat;min-height:0}
+  .story-body.noimg .thumb{display:none}
+  .stext{display:flex;flex-direction:column;min-height:0;min-width:0}
+  .kicker{color:var(--acc2);font-size:clamp(12px,1vw,19px);letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+  .stitle{font-size:clamp(26px,3vw,58px);font-weight:600;line-height:1.08;margin:.15em 0 .2em;overflow-wrap:anywhere}
+  .smeta{display:flex;gap:.6em;flex-wrap:wrap;align-items:center;color:var(--dim);font-size:clamp(15px,1.4vw,27px);margin-bottom:.5em}
+  .smeta .dir{color:var(--txt);font-weight:600}
+  .tag{border:1px solid var(--line);border-radius:999px;padding:.1em .7em;font-size:.8em}
+  .sdesc{flex:1;overflow:auto;font-size:clamp(16px,1.45vw,28px);line-height:1.42;color:#dfe2e6;padding-right:.4em;min-height:0;-webkit-overflow-scrolling:touch}
+  .sdesc p{margin:0 0 .6em}
+  .sdesc .more{color:#c3c8cf}
+  .src{color:var(--dim);font-size:clamp(11px,.9vw,17px);margin-top:.6em}
+  .src a{color:#a9b9ff}
+  .controls{display:grid;grid-template-columns:1.25fr 1fr 1fr 1fr;gap:1vw;padding:1vh 1.6vw 1.8vh}
+  .btn{appearance:none;border:1px solid var(--line);border-radius:14px;background:var(--panel2);color:var(--txt);
+    font-size:clamp(15px,1.35vw,27px);font-weight:600;padding:0 1.2vw;min-height:clamp(56px,8.5vh,104px);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:.45em;touch-action:manipulation;white-space:nowrap}
+  .btn:active{filter:brightness(1.3);transform:scale(.985)}
+  .btn:disabled{opacity:.4}
+  .btn.primary{background:var(--acc);border-color:var(--acc)}
+  .btn.on{background:#1d2a4a;border-color:var(--acc2)}
+  .btn .ico{font-size:1.15em}
+
+  /* Höger kolumn */
+  .right{display:grid;grid-template-rows:1fr 1.15fr;gap:1.3vh;min-height:0}
+  .right.nomap{grid-template-rows:0 1fr}
+  .right.nomap .mapcard{display:none}
+  .mapcard{position:relative;isolation:isolate;z-index:0}
+  #map{position:absolute;inset:0;background:#15171a}
+  .mapmsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:clamp(13px,1.1vw,20px);text-align:center;padding:1em}
+  .listcard{display:grid;grid-template-rows:auto 1fr;min-height:0}
+  .tabs{display:grid;grid-template-columns:1fr 1.4fr;gap:.6vw;padding:1vh .8vw .6vh}
+  .tab{appearance:none;border:1px solid var(--line);background:var(--panel2);border-radius:12px;min-height:clamp(46px,6.5vh,80px);
+    font-size:clamp(13px,1.15vw,22px);font-weight:600;cursor:pointer;touch-action:manipulation;white-space:nowrap;padding:0 .5em}
+  .tab.sel{background:#1d2a4a;border-color:var(--acc2)}
+  .list{overflow:auto;padding:.2vh .8vw 1vh;min-height:0;-webkit-overflow-scrolling:touch}
+  .item{display:grid;grid-template-columns:auto 1fr auto;gap:.8em;align-items:center;width:100%;text-align:left;appearance:none;background:transparent;
+    border:0;border-bottom:1px solid var(--line);padding:.75em .3em;cursor:pointer;min-height:clamp(52px,7vh,84px)}
+  .item:active{background:var(--panel2)}
+  .item .ii{width:clamp(38px,3.4vw,62px);height:clamp(38px,3.4vw,62px);border-radius:10px;background:#262a30 center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:1.3em}
+  .item b{display:block;font-size:clamp(14px,1.2vw,23px);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .item small{display:block;color:var(--dim);font-size:clamp(11px,.95vw,18px);margin-top:.15em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .item .when{color:var(--dim);font-size:clamp(11px,.9vw,17px);white-space:nowrap}
+  .empty{color:var(--dim);padding:1.2em .4em;font-size:clamp(13px,1.1vw,21px);line-height:1.4}
+
+  /* Sidfot */
+  footer{display:grid;grid-template-columns:auto 1fr 1fr auto auto;gap:1vw;align-items:stretch}
+  .btn.start{background:var(--acc);border-color:var(--acc);min-width:clamp(150px,15vw,300px);font-size:clamp(18px,1.7vw,34px)}
+  .btn.start.on{background:var(--red);border-color:var(--red)}
+  .seg{display:flex;align-items:center;gap:.5vw;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:.6vh .6vw;min-width:0}
+  .seg label{color:var(--dim);font-size:clamp(11px,1vw,19px);padding:0 .4vw;white-space:nowrap}
+  .seg button{flex:1;appearance:none;border:1px solid transparent;background:transparent;border-radius:10px;min-height:clamp(44px,6.5vh,86px);
+    font-size:clamp(13px,1.2vw,23px);font-weight:600;color:var(--dim);cursor:pointer;touch-action:manipulation;white-space:nowrap;padding:0 .3em}
+  .seg button.sel{background:#1d2a4a;border-color:var(--acc2);color:#fff}
+  .credit{color:#5d636b;font-size:clamp(10px,.75vw,15px);text-align:center;line-height:1.3}
+  .credit a{color:#7d848d}
+
+  /* Överlägg */
+  .overlay{position:fixed;inset:0;background:rgba(8,9,11,.94);z-index:1000;display:none;align-items:center;justify-content:center;padding:3vh 3vw}
+  .overlay.show{display:flex}
+  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:22px;width:min(1100px,96vw);max-height:94vh;overflow:auto;padding:3vh 2.4vw;-webkit-overflow-scrolling:touch}
+  .sheet h2{margin:0 0 .3em;font-size:clamp(24px,2.6vw,48px);font-weight:600}
+  .sheet h3{margin:1.2em 0 .4em;font-size:clamp(16px,1.4vw,26px);color:var(--acc2);font-weight:600}
+  .sheet p,.sheet li{color:#cfd3d8;font-size:clamp(14px,1.2vw,22px);line-height:1.45}
+  .sheet ul{padding-left:1.2em;margin:.3em 0}
+  .startgrid{display:grid;grid-template-columns:1.3fr 1fr;gap:1.4vw;margin-top:2vh}
+  .startgrid .btn{min-height:clamp(70px,13vh,150px);font-size:clamp(20px,2vw,38px);flex-direction:column;gap:.2em;white-space:normal;text-align:center}
+  .startgrid .btn small{font-size:.5em;font-weight:400;color:#dfe5ff;opacity:.85}
+  .startgrid .col{display:grid;gap:1.2vh}
+  .startgrid .col .btn{min-height:clamp(56px,6vh,72px);font-size:clamp(15px,1.4vw,26px)}
+  .setrow{display:grid;grid-template-columns:minmax(140px,16em) 1fr;gap:1vw;align-items:center;margin:.9vh 0}
+  .setrow>span{color:var(--dim);font-size:clamp(14px,1.15vw,22px)}
+  .setrow .seg{padding:.4vh .4vw}
+  .sheet .closebar{display:flex;gap:1vw;justify-content:flex-end;margin-top:2vh;flex-wrap:wrap}
+  .sheet .closebar .btn{min-width:12em}
+  #msg{position:fixed;left:50%;top:10vh;transform:translateX(-50%);max-width:74vw;background:#2a1a1a;border:1px solid var(--red);
+    color:#ffd9d9;padding:1em 1.4em;border-radius:14px;font-size:clamp(14px,1.25vw,24px);display:none;z-index:1100;box-shadow:0 10px 40px #000a;line-height:1.4}
+  #msg.info{background:#1a2238;border-color:var(--acc2);color:#dfe7ff}
+  #msg .row{display:flex;gap:.8em;margin-top:.8em;flex-wrap:wrap}
+  #msg .btn{min-height:48px;font-size:.95em}
+  .leaflet-container{background:#15171a!important;font:inherit}
+  .leaflet-control-attribution{font-size:10px!important;background:rgba(20,20,22,.75)!important;color:#888!important}
+  .leaflet-control-attribution a{color:#aab!important}
+  .carmk{width:22px;height:22px;border-radius:50%;background:var(--acc2);border:3px solid #fff;box-shadow:0 0 0 6px rgba(91,132,255,.3)}
+  .demobar{position:absolute;left:8px;bottom:8px;z-index:500;display:none;gap:6px}
+  .demobar.show{display:flex}
+  .demobar button{appearance:none;border:1px solid var(--warn);background:rgba(23,25,28,.92);color:var(--warn);border-radius:10px;min-height:44px;padding:0 .9em;font-weight:600;font-size:clamp(12px,1vw,18px);cursor:pointer}
+  #speakbar{height:4px;background:linear-gradient(90deg,var(--acc2),transparent);opacity:0;transition:opacity .3s;margin:0 1.6vw}
+  #speakbar.on{opacity:1;animation:pulse 1.4s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.35}}
+
+  /* ===== Mobil i liggande läge ===== */
+  @media (orientation:landscape) and (max-height:540px){
+    .app{padding:5px max(8px,env(safe-area-inset-right)) 4px max(8px,env(safe-area-inset-left));gap:5px}
+    h1{font-size:15px}
+    .chips{gap:4px}
+    .chip{font-size:10px;padding:3px 7px}
+    .chip.hide-m{display:none}
+    main{grid-template-columns:1.6fr 1fr;gap:6px}
+    .card{border-radius:12px}
+    .story-body{padding:8px 10px 2px;gap:10px}
+    .thumb{width:120px;border-radius:10px}
+    .kicker{font-size:9px}
+    .stitle{font-size:20px}
+    .smeta{font-size:12px;margin-bottom:3px}
+    .sdesc{font-size:13px;line-height:1.35}
+    .src{font-size:9px;margin-top:3px}
+    .controls{padding:4px 8px 6px;gap:5px}
+    .btn{font-size:12px;min-height:40px;border-radius:10px;padding:0 6px}
+    .right{grid-template-rows:.85fr 1.15fr;gap:5px}
+    .tabs{padding:4px;gap:4px}
+    .tab{min-height:32px;font-size:11px;border-radius:8px}
+    .list{padding:0 6px 4px}
+    .item{min-height:38px;padding:.35em .2em;gap:.5em}
+    .item .ii{width:28px;height:28px;border-radius:7px;font-size:14px}
+    .item b{font-size:12px} .item small{font-size:10px} .item .when{font-size:9px}
+    footer{gap:5px}
+    .btn.start{min-width:110px;font-size:14px}
+    .seg{padding:2px 4px;gap:3px;border-radius:10px}
+    .seg label{font-size:10px;padding:0 2px}
+    .seg button{min-height:34px;font-size:11px;border-radius:8px}
+    .credit{font-size:8.5px;line-height:1.1}
+    .credit .cr-long{display:none}
+    #msg{top:3vh;max-width:92vw;font-size:13px;padding:.7em 1em}
+    .sheet{padding:12px 14px;border-radius:14px;max-height:96vh}
+    .sheet h2{font-size:20px} .sheet h3{font-size:14px} .sheet p,.sheet li{font-size:12px}
+    .startgrid{margin-top:8px;gap:8px}
+    .startgrid .btn{min-height:70px;font-size:17px}
+    .startgrid .col{gap:6px} .startgrid .col .btn{min-height:40px;font-size:13px}
+    .setrow{margin:4px 0} .setrow>span{font-size:12px}
+    .demobar button{min-height:34px;font-size:11px}
+  }
+  #rotate{display:none}
+  @media (orientation:portrait) and (max-width:600px){
+    #rotate{display:flex;position:fixed;inset:0;z-index:40;background:var(--bg);color:var(--txt);align-items:center;justify-content:center;
+      flex-direction:column;gap:14px;text-align:center;padding:24px;font-size:18px}
+    #rotate .ico{font-size:56px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Reseguide <span>· TeslaZanders</span></h1>
+    <div class="chips">
+      <div class="chip demo" id="chipDemo" style="display:none">DEMO</div>
+      <div class="chip"><span class="dot" id="dGps"></span><span id="tGps">GPS: av</span></div>
+      <div class="chip"><b id="tSpd">0</b> km/h</div>
+      <div class="chip hide-m">Radie <b id="tRad">2</b> km</div>
+      <div class="chip"><span class="dot" id="dVoice"></span><span id="tVoice">Röst: av</span></div>
+      <div class="chip hide-m"><span class="dot" id="dWake"></span><span id="tWake">Skärm: normal</span></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="card story" aria-live="polite">
+      <div class="story-body noimg" id="storyBody">
+        <div class="thumb" id="sThumb"></div>
+        <div class="stext">
+          <div class="kicker" id="sKicker">Reseguiden</div>
+          <div class="stitle" id="sTitle">Välkommen ombord!</div>
+          <div class="smeta" id="sMeta"></div>
+          <div class="sdesc" id="sDesc"><p>Tryck på <b>Starta guiden</b> så berättar jag om städer, slott, kyrkor, sjöar, berg och historiska platser som ni passerar – högt och här på skärmen.</p><p>Vill du testa hemma? Välj <b>Demo</b> så kör vi en låtsasresa längs E6 från Stenungsund till Göteborg.</p></div>
+          <div class="src" id="sSrc"></div>
+        </div>
+      </div>
+      <div>
+        <div id="speakbar"></div>
+        <div class="controls">
+          <button class="btn" id="bPlay" disabled><span class="ico">⏸</span><span>Pausa guiden</span></button>
+          <button class="btn" id="bSkip" disabled><span class="ico">⏭</span><span>Hoppa över</span></button>
+          <button class="btn" id="bMore" disabled><span class="ico">＋</span><span>Berätta mer</span></button>
+          <button class="btn" id="bRepeat" disabled><span class="ico">↻</span><span>Upprepa</span></button>
+        </div>
+      </div>
+    </section>
+    <div class="right" id="rightCol">
+      <section class="card mapcard"><div id="map"></div><div class="mapmsg" id="mapMsg">Kartan visas när guiden startar</div>
+        <div class="demobar" id="demoBar"><button id="bTempo">Tempo ×3</button><button id="bDemoStop">Stoppa demo</button></div>
+      </section>
+      <section class="card listcard">
+        <div class="tabs">
+          <button class="tab sel" id="tabHist">Senast berättat</button>
+          <button class="tab" id="tabNear">Vad finns i närheten?</button>
+        </div>
+        <div class="list" id="list"></div>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <button class="btn start" id="bStart">Starta guiden</button>
+    <div class="seg" id="segTalk"><label>Pratighet</label><button data-v="lite">Lite</button><button data-v="normal">Normal</button><button data-v="mycket">Mycket</button></div>
+    <div class="seg" id="segLang"><label>Språk</label><button data-v="sv">Svenska</button><button data-v="en">English</button></div>
+    <button class="btn" id="bDemo">Demo</button>
+    <button class="btn" id="bSettings" aria-label="Inställningar och hjälp">⚙ Hjälp</button>
+  </footer>
+  <div class="credit"><span class="cr-long">Fakta från <a href="https://sv.wikipedia.org/" target="_blank" rel="noopener">Wikipedia</a> (texter under <a href="https://creativecommons.org/licenses/by-sa/4.0/deed.sv" target="_blank" rel="noopener">CC BY-SA 4.0</a>, länk till varje artikel visas på kortet). Karta © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-bidragsgivare. Ha alltid fokus på trafiken.</span><span class="cr-short" style="display:none"></span></div>
+</div>
+
+<!-- Startskärm -->
+<div class="overlay show" id="ovStart">
+  <div class="sheet">
+    <h2>Reseguide 🚗</h2>
+    <p>Medan ni kör berättar guiden automatiskt om platser ni passerar – orter, slott, kyrkor, sjöar, berg och historiska platser. Fakta hämtas från Wikipedia. Starta guiden medan bilen står parkerad.</p>
+    <div class="startgrid">
+      <button class="btn primary" id="bGoGps">▶ Starta guiden<small>Använder bilens/telefonens position</small></button>
+      <div class="col">
+        <button class="btn" id="bGoDemo1">Demo: Stenungsund → Göteborg (E6)</button>
+        <button class="btn" id="bGoDemo2">Demo: Rhendalen, Koblenz → Bingen</button>
+        <button class="btn" id="bGoHelp">Hjälp &amp; inställningar</button>
+      </div>
+    </div>
+    <div class="setrow" style="margin-top:2vh"><span>Berättarspråk</span><div class="seg" id="segLang2"><button data-v="sv">Svenska</button><button data-v="en">English</button></div></div>
+    <p style="margin-top:1vh;color:var(--dim)">Ljud kräver ett tryck först i Teslans webbläsare – därför den stora knappen. Volymen styr du med bilens ratt.</p>
+  </div>
+</div>
+
+<!-- Inställningar & hjälp -->
+<div class="overlay" id="ovSet">
+  <div class="sheet">
+    <h2>Inställningar &amp; hjälp</h2>
+    <div class="setrow"><span>Röst</span><div class="seg" id="segEngine"><button data-v="auto">Automatisk</button><button data-v="browser">Webbläsarens röst</button><button data-v="online">Online-röst</button><button data-v="text">Endast text</button></div></div>
+    <div class="setrow"><span>Kom ihåg berättade platser</span><div class="seg" id="segMem"><button data-v="1">1 dag</button><button data-v="7">1 vecka</button><button data-v="30">30 dagar</button><button data-v="3650">Alltid</button></div></div>
+    <div class="setrow"><span>Karta</span><div class="seg" id="segMap"><button data-v="1">Visa</button><button data-v="0">Dölj</button></div></div>
+    <div class="setrow"><span>Röststatus</span><div id="voiceInfo" style="color:#cfd3d8;font-size:clamp(13px,1.1vw,20px)">–</div></div>
+    <div class="closebar">
+      <button class="btn" id="bTestVoice">🔊 Testa rösten</button>
+      <button class="btn" id="bClear">Glöm berättade platser</button>
+      <button class="btn primary" id="bCloseSet">Klar</button>
+    </div>
+    <h3>Så fungerar det</h3>
+    <ul>
+      <li>Guiden följer position, fart och färdriktning och väljer intressanta platser <b>framför</b> bilen. Sökradien växer med farten – cirka 2 km i stan och upp till 9 km på motorväg.</li>
+      <li><b>Pratighet</b>: Lite = bara de mest kända platserna, högst var tredje minut. Normal = ungefär var 90:e sekund. Mycket = tätare och även mindre platser.</li>
+      <li><b>Språk</b>: Svenska Wikipedia används i första hand. Saknas artikel (t.ex. utomlands) används engelska eller landets egen Wikipedia – då läses texten på det språket.</li>
+      <li>Samma plats berättas inte igen under den tid du valt ovan. Tryck i listan för att höra en plats igen.</li>
+    </ul>
+    <h3>Tesla-webbläsaren</h3>
+    <ul>
+      <li>Öppna sidan och tryck <b>Starta guiden</b> medan bilen står parkerad. I vissa regioner kan föraren inte använda webbläsaren under körning, men ljudet fortsätter att spelas.</li>
+      <li>Teslans webbläsare har ofta <b>ingen inbyggd talsyntes</b> (inga röster). Då visas texten ändå på skärmen. Välj <b>Online-röst</b> ovan för att få uppläsning via en röst från nätet (experimentellt, kräver mobildata). Testa med <b>🔊 Testa rösten</b>.</li>
+      <li>Volymen styrs med bilens volymreglage. Tips: spara sidan som favorit i webbläsaren.</li>
+      <li>På mobilen: använd liggande läge och låt skärmen vara på (guiden försöker hålla skärmen vaken).</li>
+    </ul>
+    <h3>Källor</h3>
+    <p>Fakta från Wikipedia, tillgängligt under <a href="https://creativecommons.org/licenses/by-sa/4.0/deed.sv" target="_blank" rel="noopener">CC BY-SA 4.0</a>. Varje berättelse länkar till sin artikel. Bilder från Wikimedia Commons. Karta © OpenStreetMap-bidragsgivare. Gjord för TeslaZanders.</p>
+  </div>
+</div>
+
+<div id="msg"></div>
+<div id="rotate"><div class="ico">📱↻</div><div>Vrid mobilen till liggande läge</div></div>
+
+<script src="routes.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
