@@ -663,6 +663,22 @@ function renderList(){
 }
 function ago(t){ const m = Math.round((Date.now() - t) / 60000); if (m < 1) return 'nyss'; if (m < 60) return m + ' min'; const h = Math.round(m / 60); if (h < 24) return h + ' h'; return Math.round(h / 24) + ' d'; }
 
+/* OSM-kartrutor: måste skicka Referer (OSM:s policy). Sidan blockerar annars Referer för Google-rösten,
+   så vi slår på den per kartlager. Vid upprepade fel byts till CARTO som reserv. */
+function addBaseMap(map){
+  const OSM = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, referrerPolicy: 'strict-origin-when-cross-origin',
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-bidragsgivare'});
+  const CARTO = () => L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {maxZoom: 19, subdomains: 'abcd', referrerPolicy: 'strict-origin-when-cross-origin',
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-bidragsgivare © <a href="https://carto.com/attributions">CARTO</a>'});
+  let ok = 0, bad = 0, switched = false;
+  OSM.on('tileload', () => { ok++; });
+  OSM.on('tileerror', () => { bad++;
+    if (!switched && bad >= 4 && ok === 0){ switched = true; map.removeLayer(OSM); CARTO().addTo(map); window.__mapProvider = 'carto'; }
+  });
+  window.__mapProvider = 'osm';
+  OSM.addTo(map); return OSM;
+}
+
 /* ---------- Karta (Leaflet, laddas bara om den behövs) ---------- */
 let map = null, carMk = null, placeLayer = null, mapLoading = false, follow = true;
 function initMap(){
@@ -671,7 +687,7 @@ function initMap(){
   const s = document.createElement('script'); s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
   s.onload = () => { try { $('mapMsg').style.display = 'none';
     map = L.map('map', {zoomControl:false, attributionControl:true}).setView(pos ? [pos.lat, pos.lon] : [58.07, 11.82], 12);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:18, attribution:'© OpenStreetMap'}).addTo(map);
+    addBaseMap(map);
     placeLayer = L.layerGroup().addTo(map); map.on('dragstart', () => { follow = false; setTimeout(() => follow = true, 20000); });
     moveCar(); updateMap(); } catch (e) { $('mapMsg').textContent = 'Kartan kunde inte visas'; } };
   s.onerror = () => { $('mapMsg').textContent = 'Kartan kunde inte laddas (ingen uppkoppling?) – guiden fungerar ändå.'; mapLoading = false; };
