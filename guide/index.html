@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#111214">
+<!-- Ingen Referer: Googles translate_tts svarar 404 på anrop med Referer (online-rösten) -->
+<meta name="referrer" content="no-referrer">
 <link rel="icon" href="data:,">
 <title>Reseguide – berättar om platserna du passerar</title>
 <style>
@@ -258,7 +260,7 @@
 <div class="overlay" id="ovSet">
   <div class="sheet">
     <h2>Inställningar &amp; hjälp</h2>
-    <div class="setrow"><span>Röst</span><div class="seg" id="segEngine"><button data-v="auto">Automatisk</button><button data-v="browser">Webbläsarens röst</button><button data-v="online">Online-röst</button><button data-v="text">Endast text</button></div></div>
+    <div class="setrow"><span>Röst</span><div class="seg" id="segEngine"><button data-v="auto">Automatisk</button><button data-v="browser">Webbläsarens röst</button><button data-v="local">Lokal AI-röst</button><button data-v="online">Online-röst</button><button data-v="text">Endast text</button></div></div>
     <div class="setrow"><span>Kom ihåg berättade platser</span><div class="seg" id="segMem"><button data-v="1">1 dag</button><button data-v="7">1 vecka</button><button data-v="30">30 dagar</button><button data-v="3650">Alltid</button></div></div>
     <div class="setrow"><span>Karta</span><div class="seg" id="segMap"><button data-v="1">Visa</button><button data-v="0">Dölj</button></div></div>
     <div class="setrow"><span>Röststatus</span><div id="voiceInfo" style="color:#cfd3d8;font-size:clamp(13px,1.1vw,20px)">–</div></div>
@@ -277,7 +279,7 @@
     <h3>Tesla-webbläsaren</h3>
     <ul>
       <li>Öppna sidan och tryck <b>Starta guiden</b> medan bilen står parkerad. I vissa regioner kan föraren inte använda webbläsaren under körning, men ljudet fortsätter att spelas.</li>
-      <li>Teslans webbläsare har ofta <b>ingen inbyggd talsyntes</b> (inga röster). Då visas texten ändå på skärmen. Välj <b>Online-röst</b> ovan för att få uppläsning via en röst från nätet (experimentellt, kräver mobildata). Testa med <b>🔊 Testa rösten</b>.</li>
+      <li>Teslans webbläsare har <b>ingen inbyggd talsyntes</b> (inga röster). Då använder guiden en <b>lokal svensk AI-röst</b> som körs direkt i webbläsaren. Första gången laddas den ner (ca 92 MB – gärna via wifi, förloppet syns som <i>Röst: laddar %</i>), sedan sparas den och startar på några sekunder. <b>Online-röst</b> (Google) finns kvar som reserv. Texten visas alltid på skärmen. Testa med <b>🔊 Testa rösten</b>.</li>
       <li>Volymen styrs med bilens volymreglage. Tips: spara sidan som favorit i webbläsaren.</li>
       <li>På mobilen: använd liggande läge och låt skärmen vara på (guiden försöker hålla skärmen vaken).</li>
     </ul>

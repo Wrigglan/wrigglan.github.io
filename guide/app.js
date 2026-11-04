@@ -230,15 +230,92 @@ function addHist(p){
 }
 const catByKey = k => CATS.find(c => c.k === k) || {k:'other', w:1, l:'Plats', i:'📍'};
 
-/* ---------- Röst ---------- */
+/* ---------- Röst ----------
+   Ordning (Automatisk): 1) webbläsarens talsyntes om en fungerande svensk röst finns,
+   2) lokal svensk AI-röst (Piper, körs i webbläsaren via WebAssembly – laddas ner en gång och cachas),
+   3) online-röst (Google, inofficiell) som sista utväg, 4) endast text. */
 const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+function pcmToWav(f, sr){ const n = f.length, b = new DataView(new ArrayBuffer(44 + n * 2)); const w = (o, s) => { for (let i = 0; i < s.length; i++) b.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); b.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); b.setUint32(16, 16, true); b.setUint16(20, 1, true); b.setUint16(22, 1, true); b.setUint32(24, sr, true); b.setUint32(28, sr * 2, true); b.setUint16(32, 2, true); b.setUint16(34, 16, true); w(36, 'data'); b.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++){ const s = Math.max(-1, Math.min(1, f[i])); b.setInt16(44 + i * 2, s < 0 ? s * 32768 : s * 32767, true); }
+  return new Blob([b.buffer], {type: 'audio/wav'}); }
+
+// Uppspelning: EN AudioContext som låses upp vid första trycket (samma teknik som Motorljud använder),
+// med ett beständigt <audio>-element som reserv. Återupptas automatiskt när sidan blir synlig igen.
+const Player = {
+  ctx: null, src: null, el: null, endCb: null,
+  unlock(){ // måste anropas i ett tryck
+    try { const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC && !this.ctx){ this.ctx = new AC(); this.ctx.onstatechange = () => { if (this.ctx.state !== 'running' && document.visibilityState === 'visible') this.ctx.resume().catch(() => {}); }; }
+      if (this.ctx){ this.ctx.resume().catch(() => {}); const b = this.ctx.createBuffer(1, 1, 22050), s = this.ctx.createBufferSource(); s.buffer = b; s.connect(this.ctx.destination); s.start(0); }
+    } catch (e) { console.warn('AudioContext', e); }
+    try { if (!this.el){ this.el = new Audio(); this.el.preload = 'auto'; }
+      if (this.el.paused){ this.el.src = SILENT; const pr = this.el.play(); if (pr && pr.catch) pr.catch(() => {}); } } catch (e) {}
+  },
+  async ready(){ if (!this.ctx) return false; if (this.ctx.state !== 'running'){ try { await Promise.race([this.ctx.resume(), new Promise(r => setTimeout(r, 800))]); } catch (e) {} } return this.ctx.state === 'running'; },
+  // spelar PCM; löser när ljudet är slut (eller avbrutet)
+  async play(pcm, sr){
+    this.stop();
+    if (await this.ready()){
+      return new Promise(res => { const buf = this.ctx.createBuffer(1, pcm.length, sr); buf.copyToChannel ? buf.copyToChannel(pcm, 0) : buf.getChannelData(0).set(pcm);
+        const s = this.ctx.createBufferSource(); s.buffer = buf; s.connect(this.ctx.destination); this.src = s; this.endCb = res;
+        const wd = setTimeout(() => this._end(s), pcm.length / sr * 1000 + 3000); // vakthund
+        s.onended = () => { clearTimeout(wd); this._end(s); }; s.start(); });
+    }
+    // reserv: <audio> med WAV-blob
+    const a = this.el || (this.el = new Audio()), url = URL.createObjectURL(pcmToWav(pcm, sr));
+    return new Promise((res, rej) => { let done = false; const fin = err => { if (done) return; done = true; clearTimeout(wd); a.onended = a.onerror = null; URL.revokeObjectURL(url); this.endCb = null; err ? rej(err) : res(); };
+      const wd = setTimeout(() => fin(), pcm.length / sr * 1000 + 4000); this.endCb = () => fin();
+      a.onended = () => fin(); a.onerror = () => fin(new Error('Ljudet kunde inte spelas'));
+      a.src = url; const pr = a.play(); if (pr && pr.catch) pr.catch(e => fin(e)); });
+  },
+  _end(s){ if (this.src === s){ this.src = null; const cb = this.endCb; this.endCb = null; if (cb) cb(); } },
+  stop(){ if (this.src){ const s = this.src; try { s.onended = null; s.stop(); } catch (e) {} this._end(s); }
+    else if (this.endCb){ try { this.el.pause(); } catch (e) {} const cb = this.endCb; this.endCb = null; cb(); } },
+};
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Player.ctx && Player.ctx.state !== 'running') Player.ctx.resume().catch(() => {}); });
+
+// Lokal neural röst i en Web Worker (tts-worker.js)
+const Neural = {
+  state: 'idle', pct: 0, err: '', info: null, worker: null, waiters: [], pending: new Map(), seq: 0, voice: 'lisa', stats: [],
+  supported(){ return typeof Worker !== 'undefined' && typeof WebAssembly === 'object' && !!(window.AudioContext || window.webkitAudioContext || window.Audio); },
+  load(){
+    if (this.state === 'ready') return Promise.resolve(true);
+    const p = new Promise(r => this.waiters.push(r));
+    if (this.state === 'loading') return p;
+    if (!this.supported()){ this.state = 'error'; this.err = 'Webbläsaren saknar Web Worker/WebAssembly'; this._settle(false); return p; }
+    this.state = 'loading'; this.pct = 0; this.err = ''; updateVoiceChip();
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}
+    try {
+      if (!this.worker){ this.worker = new Worker('tts-worker.js'); this.worker.onmessage = e => this._msg(e.data);
+        this.worker.onerror = e => { this._fail('Röstmotorn kraschade' + (e && e.message ? ': ' + e.message : '')); }; }
+      this.worker.postMessage({type: 'init', voice: this.voice});
+    } catch (e) { this._fail(String(e && e.message || e)); }
+    return p;
+  },
+  _settle(ok){ const w = this.waiters; this.waiters = []; w.forEach(r => r(ok)); updateVoiceChip(); },
+  _fail(msg){ console.warn('Lokal röst:', msg); this.state = 'error'; this.err = msg; try { this.worker && this.worker.terminate(); } catch (e) {} this.worker = null;
+    for (const [, p] of this.pending) p.rej(new Error(msg)); this.pending.clear(); this._settle(false); },
+  _msg(m){
+    if (m.type === 'progress'){ this.pct = m.pct; updateVoiceChip(); }
+    else if (m.type === 'ready'){ this.state = 'ready'; this.info = m; LS.set('ttsCached', 1); console.log('Lokal röst klar', m); this._settle(true); }
+    else if (m.type === 'error') this._fail(m.msg);
+    else if (m.type === 'log') console.warn(m.msg);
+    else { const p = this.pending.get(m.id); if (!p) return; this.pending.delete(m.id);
+      if (m.type === 'audio'){ this.stats.push({ms: m.ms, sec: m.sec}); if (this.stats.length > 50) this.stats.shift(); p.res(m); }
+      else if (m.type === 'skipped') p.res(null); else p.rej(new Error(m.msg)); }
+  },
+  synth(text, lang){ if (this.state !== 'ready') return Promise.reject(new Error('Rösten är inte laddad'));
+    const id = ++this.seq; return new Promise((res, rej) => { this.pending.set(id, {res, rej}); this.worker.postMessage({type: 'synth', id, text, lang}); }); },
+  cancel(){ if (this.worker) this.worker.postMessage({type: 'cancel'}); for (const [, p] of this.pending) p.res(null); this.pending.clear(); },
+};
+
 const Voice = {
   hasSynth: 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window,
-  voices: [], synthOk: null, active: 'text', queue: [], speaking: false, audio: null, token: 0, onDone: null,
+  voices: [], synthOk: null, active: 'text', queue: [], speaking: false, audio: null, token: 0, onDone: null, lastResult: '',
   loadVoices(){ if (!this.hasSynth) return; try { this.voices = speechSynthesis.getVoices() || []; } catch (e) { this.voices = []; } },
   unlock(){ // måste ske i ett tryck
-    try { if (!this.audio){ this.audio = new Audio(); this.audio.setAttribute('referrerpolicy', 'no-referrer'); try { this.audio.referrerPolicy = 'no-referrer'; } catch (e) {} }
-      this.audio.src = SILENT; const pr = this.audio.play(); if (pr && pr.catch) pr.catch(() => {}); } catch (e) {}
+    Player.unlock(); this.audio = Player.el;
     if (this.hasSynth){ try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) {} }
   },
   async probe(){ // finns det en fungerande inbyggd röst?
@@ -260,29 +337,47 @@ const Voice = {
     return vs.find(v => v.lang && v.lang.replace('_', '-').toLowerCase() === L.toLowerCase()) || vs.find(v => v.lang && v.lang.toLowerCase().startsWith(lang)) || null; },
   hasLang(lang){ return !!this.pick(lang); },
   choose(){
-    if (S.engine === 'text') this.active = 'text';
-    else if (S.engine === 'online') this.active = 'online';
-    else if (S.engine === 'browser') this.active = this.hasSynth ? 'browser' : 'text';
-    else this.active = this.synthOk ? 'browser' : 'text';
+    const e = S.engine;
+    if (e === 'text') this.active = 'text';
+    else if (e === 'online') this.active = 'online';
+    else if (e === 'browser') this.active = this.hasSynth ? 'browser' : 'text';
+    else if (e === 'local') this.active = Neural.state === 'error' ? 'text' : 'neural';
+    else { // automatisk
+      if (this.synthOk && this.hasLang(S.lang)) this.active = 'browser';
+      else if (Neural.supported() && Neural.state !== 'error') this.active = 'neural';
+      else if (this.synthOk) this.active = 'browser';
+      else this.active = 'online'; // sista utväg; faller till text om den inte svarar
+    }
+    if (this.active === 'neural' && Neural.state === 'idle') Neural.load().then(() => this.choose());
     updateVoiceChip();
   },
   stop(){ this.token++; this.queue = []; this.speaking = false; speakBar(false);
     if (this.hasSynth) try { speechSynthesis.cancel(); } catch (e) {}
+    Neural.cancel(); Player.stop();
     if (this.audio) try { this.audio.pause(); } catch (e) {} },
-  // parts: [{text, lang}]
-  speak(parts, onDone){
+  // parts: [{text, lang}]; opts.wait = vänta på att den lokala rösten laddats (används av Testa rösten)
+  speak(parts, onDone, opts){
     this.stop(); const tok = this.token; this.onDone = onDone || null;
-    if (this.active === 'text'){ setTimeout(() => { if (tok === this.token && this.onDone) this.onDone(); }, 100); return; }
+    const textOnly = () => setTimeout(() => { if (tok === this.token && this.onDone){ const cb = this.onDone; this.onDone = null; cb(); } }, 100);
+    if (this.active === 'text') return textOnly();
+    if (this.active === 'neural' && Neural.state !== 'ready'){
+      if (!(opts && opts.wait)) return textOnly(); // laddar fortfarande – visa texten, läs nästa gång
+      this.speaking = true; speakBar(true);
+      Neural.load().then(ok => { if (tok !== this.token) return; this.speaking = false; if (ok) this.speak(parts, onDone); else { this.choose(); textOnly(); } });
+      return;
+    }
     const q = [];
     for (const p of parts){ if (!p.text) continue;
-      const ss = sentences(p.text);
-      for (const s of ss){ if (this.active === 'online'){ for (const c of chunk(s, 190)) q.push({text:c, lang:p.lang}); } else q.push({text:s, lang:p.lang}); } }
+      for (const s of sentences(p.text)){
+        const max = this.active === 'online' ? 190 : this.active === 'neural' ? 260 : 0;
+        if (max) for (const c of chunk(s, max)) q.push({text: c, lang: p.lang}); else q.push({text: s, lang: p.lang}); } }
     this.queue = q; this.speaking = true; speakBar(true); this.next(tok);
   },
+  _finish(tok){ if (tok !== this.token) return; this.speaking = false; speakBar(false); const cb = this.onDone; this.onDone = null; if (cb) cb(); },
   next(tok){
     if (tok !== this.token) return;
     const it = this.queue.shift();
-    if (!it){ this.speaking = false; speakBar(false); const cb = this.onDone; this.onDone = null; if (cb) cb(); return; }
+    if (!it) return this._finish(tok);
     const go = () => this.next(tok);
     if (this.active === 'browser'){
       try { const u = new SpeechSynthesisUtterance(it.text); u.lang = VOICE_LANG[it.lang] || it.lang; const v = this.pick(it.lang); if (v) u.voice = v; u.rate = 1.0;
@@ -290,29 +385,54 @@ const Voice = {
         u.onend = end; u.onerror = e => { console.warn('tal-fel', e && e.error); end(); };
         const wd = setTimeout(end, 4000 + it.text.length * 110); // vakthund om webbläsaren tystnar
         speechSynthesis.speak(u); } catch (e) { go(); }
+    } else if (this.active === 'neural'){
+      const job = it.job || Neural.synth(it.text, it.lang);
+      if (this.queue[0] && !this.queue[0].job){ const n = this.queue[0]; n.job = Neural.synth(n.text, n.lang); n.job.catch(() => {}); } // förberäkna nästa mening medan denna spelas
+      job.then(a => { if (tok !== this.token || !a) return; return Player.play(a.pcm, a.sr).then(() => { neuralFails = 0; this.lastResult = 'ok'; }); })
+        .catch(e => { neuralFail(e); })
+        .then(() => { if (tok === this.token) go(); });
     } else {
       const url = 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=' + encodeURIComponent(it.lang) + '&q=' + encodeURIComponent(it.text);
-      const a = this.audio || (this.audio = new Audio());
-      let ended = false; const end = () => { if (!ended){ ended = true; a.onended = a.onerror = null; clearTimeout(wd); go(); } };
-      const wd = setTimeout(end, 6000 + it.text.length * 120);
-      a.onended = end; a.onerror = () => { onlineFail(); end(); };
-      a.src = url; const pr = a.play(); if (pr && pr.catch) pr.catch(() => { onlineFail(); end(); });
+      const a = Player.el || (Player.el = new Audio()); this.audio = a;
+      let ended = false; const end = ok => { if (!ended){ ended = true; a.onended = a.onerror = null; clearTimeout(wd); if (ok) onlineFails = 0; this.lastResult = ok ? 'ok' : 'fel'; go(); } };
+      const wd = setTimeout(() => end(false), 6000 + it.text.length * 120);
+      a.onended = () => end(true); a.onerror = () => { onlineFail(); end(false); };
+      a.src = url; const pr = a.play(); if (pr && pr.catch) pr.catch(e => { console.warn('online-röst', e); onlineFail(); end(false); });
     }
   },
-  pause(){ if (this.active === 'browser') try { speechSynthesis.pause(); } catch (e) {} else if (this.audio) this.audio.pause(); },
+  pause(){ if (this.active === 'browser') try { speechSynthesis.pause(); } catch (e) {} else Player.stop(); },
 };
-function chunk(s, n){ const out = []; let cur = ''; for (const w of s.split(/\s+/)){ if ((cur + ' ' + w).trim().length > n){ if (cur) out.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); } if (cur) out.push(cur); return out; }
-let onlineFails = 0;
-function onlineFail(){ onlineFails++; if (onlineFails === 3) showMsg('Online-rösten svarar inte (ingen uppkoppling eller blockerad). Texten visas fortfarande på skärmen.', 'info', 7000); }
+function chunk(s, n){ const out = []; let cur = '';
+  const words = s.length > n ? s.split(/(?<=[,;:])\s+|\s+/) : [s]; // dela helst vid kommatecken
+  for (const w of words){ if ((cur + ' ' + w).trim().length > n){ if (cur) out.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); } if (cur) out.push(cur); return out; }
+let onlineFails = 0, neuralFails = 0;
+function onlineFail(){ onlineFails++; Voice.lastResult = 'fel';
+  if (onlineFails === 3){ showMsg('Online-rösten svarar inte (ingen uppkoppling eller blockerad). Guiden fortsätter med text på skärmen.', 'info', 7000);
+    if (S.engine === 'auto'){ Voice.active = 'text'; updateVoiceChip(); } } }
+function neuralFail(e){ neuralFails++; Voice.lastResult = 'fel'; console.warn('Lokal röst – fel:', e);
+  if (neuralFails === 3) showMsg('Den lokala rösten kunde inte spela upp ljud (' + (e && e.message || e) + '). Texten visas fortfarande på skärmen.', 'info', 8000); }
 function speakBar(on){ $('speakbar').classList.toggle('on', !!on); }
 function updateVoiceChip(){
-  const a = Voice.active, d = $('dVoice'), t = $('tVoice');
-  d.className = 'dot ' + (a === 'text' ? 'warn' : 'ok');
-  t.textContent = a === 'browser' ? 'Röst: på' : a === 'online' ? 'Röst: online' : 'Endast text';
-  const info = !Voice.hasSynth ? 'Webbläsaren saknar talsyntes (speechSynthesis).' :
-    Voice.synthOk === false ? `Talsyntes finns men inga fungerande röster (${Voice.voices.length} röster hittades).` :
-    Voice.synthOk ? `Inbyggd röst fungerar. Svensk röst: ${Voice.hasLang('sv') ? Voice.pick('sv').name : 'saknas – en annan röst används'}.` : 'Testas när du startar guiden.';
-  $('voiceInfo').textContent = info + ' Aktiv: ' + (a === 'browser' ? 'webbläsarens röst' : a === 'online' ? 'online-röst' : 'endast text') + '.';
+  const a = Voice.active, d = $('dVoice'), t = $('tVoice'), N = Neural;
+  let txt, cls;
+  if (a === 'neural'){
+    if (N.state === 'ready'){ txt = 'Röst: klar'; cls = 'ok'; }
+    else if (N.state === 'loading'){ txt = 'Röst: laddar ' + N.pct + '%'; cls = 'warn'; }
+    else if (N.state === 'error'){ txt = 'Röst: fel'; cls = 'err'; }
+    else { txt = 'Röst: lokal'; cls = 'warn'; }
+  } else if (a === 'browser'){ txt = 'Röst: på'; cls = 'ok'; }
+  else if (a === 'online'){ txt = onlineFails >= 3 ? 'Röst: online (svarar ej)' : 'Röst: online'; cls = onlineFails >= 3 ? 'err' : 'ok'; }
+  else { txt = 'Endast text'; cls = 'warn'; }
+  d.className = 'dot ' + cls; t.textContent = txt;
+  const syn = !Voice.hasSynth ? 'Webbläsaren saknar talsyntes (speechSynthesis).' :
+    Voice.synthOk === false ? `Webbläsarens talsyntes har inga fungerande röster (${Voice.voices.length} röster hittades).` :
+    Voice.synthOk ? `Webbläsarens röst fungerar. Svensk röst: ${Voice.hasLang('sv') ? Voice.pick('sv').name : 'saknas'}.` : 'Webbläsarens röst testas när du startar guiden.';
+  const MB = N.info ? Math.round(N.info.bytes / 1e6) : 92;
+  const loc = N.state === 'ready' ? `Lokal svensk AI-röst: klar${N.info && N.info.fromCache ? ' (från cache)' : ''}, laddades på ${(N.info.ms / 1000).toFixed(1)} s.` + (N.stats.length ? ` Senaste mening: ${N.stats[N.stats.length - 1].ms} ms för ${N.stats[N.stats.length - 1].sec.toFixed(1)} s tal.` : '') :
+    N.state === 'loading' ? `Lokal svensk AI-röst: laddar ${N.pct}% (ca ${MB} MB första gången, sparas sedan i webbläsaren).` :
+    N.state === 'error' ? `Lokal svensk AI-röst: fel – ${N.err}.` : `Lokal svensk AI-röst: inte laddad (ca ${MB} MB första gången – gärna via wifi).`;
+  const act = {browser: 'webbläsarens röst', neural: 'lokal AI-röst', online: 'online-röst', text: 'endast text'}[a];
+  $('voiceInfo').textContent = syn + ' ' + loc + ' Aktiv: ' + act + '.';
 }
 
 /* ---------- Berättande ---------- */
@@ -486,18 +606,14 @@ async function startGuide(demoKey){
   setStory('Guiden är igång', demoKey ? 'Demo: ' + ROUTES[demoKey].name : 'Söker position…', demoKey ? 'Vi låtsaskör längs ' + ROUTES[demoKey].name + '. Guiden letar efter intressanta platser framför bilen.' : 'Guiden letar efter intressanta platser framför bilen så snart positionen är klar.');
   if (S.engine === 'auto' || S.engine === 'browser'){
     await Voice.probe(); Voice.choose();
-    if (Voice.active === 'text' && S.engine === 'auto') voiceMissingMsg();
+    if (Voice.active === 'neural' && Neural.state !== 'ready') neuralLoadingMsg();
   } else Voice.choose();
-  if (Voice.active === 'online') Voice.speak([{text: S.lang === 'sv' ? 'Reseguiden är igång.' : 'The travel guide is on.', lang: S.lang}]);
+  if (Voice.active === 'online' || (Voice.active === 'neural' && Neural.state === 'ready')) Voice.speak([{text: S.lang === 'sv' ? 'Reseguiden är igång.' : 'The travel guide is on.', lang: S.lang}]);
   setTimeout(tick, 500);
 }
-function voiceMissingMsg(){
-  const m = $('msg'); m.className = 'info'; m.innerHTML = '';
-  const t = document.createElement('div'); t.textContent = (Voice.hasSynth ? 'Webbläsaren har talsyntes men ingen röst svarar' : 'Den här webbläsaren saknar talsyntes') + ' – vanligt i Teslas webbläsare. Guiden fortsätter med text på skärmen. Vill du prova uppläsning med en online-röst (experimentellt, kräver uppkoppling)?';
-  const row = document.createElement('div'); row.className = 'row';
-  const b1 = document.createElement('button'); b1.className = 'btn primary'; b1.textContent = 'Använd online-röst'; b1.onclick = () => { S.engine = 'online'; saveS(); Voice.unlock(); Voice.choose(); syncSegs(); hideMsg(); Voice.speak([{text: S.lang === 'sv' ? 'Nu läser jag upp med online-rösten.' : 'Using the online voice now.', lang: S.lang}]); };
-  const b2 = document.createElement('button'); b2.className = 'btn'; b2.textContent = 'Fortsätt med text'; b2.onclick = hideMsg;
-  row.append(b1, b2); m.append(t, row); m.style.display = 'block'; clearTimeout(msgT); msgT = setTimeout(hideMsg, 25000);
+function neuralLoadingMsg(){
+  if (LS.get('ttsCached', 0)) return; // redan nedladdad – laddas tyst från cachen
+  showMsg('Webbläsaren har ingen inbyggd röst (vanligt i Tesla). Laddar ner en svensk AI-röst som körs direkt i bilen (ca 92 MB, bara första gången – sparas sedan). Guiden visar text tills rösten är klar.', 'info', 12000);
 }
 function stopGuide(){
   running = false; Voice.stop(); Geo.stop(); clearInterval(tickTimer);
@@ -591,7 +707,7 @@ function syncSegs(){
 seg('segTalk', 'talk');
 const onLang = () => { pool.clear(); geoCache.clear(); lastQuery = null; if (running) refresh(true); };
 seg('segLang', 'lang', null, onLang); seg('segLang2', 'lang', null, onLang);
-seg('segEngine', 'engine', null, () => { Voice.unlock(); if (S.engine === 'browser' && Voice.synthOk == null && running) Voice.probe().then(() => Voice.choose()); else Voice.choose(); });
+seg('segEngine', 'engine', null, () => { Voice.unlock(); onlineFails = 0; if (Neural.state === 'error' && S.engine === 'local') Neural.state = 'idle'; if ((S.engine === 'browser' || S.engine === 'auto') && Voice.synthOk == null) Voice.probe().then(() => Voice.choose()); else Voice.choose(); });
 seg('segMem', 'mem', Number);
 seg('segMap', 'map', Number, () => { $('rightCol').classList.toggle('nomap', !S.map); if (S.map && running) initMap(); if (map) setTimeout(() => map.invalidateSize(), 50); });
 syncSegs(); $('rightCol').classList.toggle('nomap', !S.map);
@@ -608,9 +724,23 @@ $('bTempo').onclick = () => { S.tempo = S.tempo === 1 ? 3 : S.tempo === 3 ? 6 : 
 $('bSettings').onclick = () => { updateVoiceChip(); $('ovSet').classList.add('show'); };
 $('bCloseSet').onclick = () => { $('ovSet').classList.remove('show'); if (!running && !$('ovStart').dataset.seen){ $('ovStart').dataset.seen = 1; } };
 $('bClear').onclick = () => { told = {}; LS.set('told', told); hist = []; LS.set('hist', hist); renderList(); showMsg('Guiden har glömt alla berättade platser.', 'info', 3000); };
-$('bTestVoice').onclick = async () => { Voice.unlock(); if (Voice.synthOk == null && S.engine !== 'online' && S.engine !== 'text') await Voice.probe(); Voice.choose();
-  if (Voice.active === 'text'){ showMsg(S.engine === 'text' ? 'Du har valt Endast text.' : 'Ingen röst fungerar i den här webbläsaren. Prova Online-röst.', 'info', 5000); return; }
-  Voice.speak([{text: 'Hej! Så här låter reseguiden. Välkommen till TeslaZanders.', lang: 'sv'}]); updateVoiceChip(); };
+$('bTestVoice').onclick = async () => {
+  Voice.unlock(); // i trycket – låser upp ljudet
+  if (Neural.state === 'error' && S.engine !== 'text') Neural.state = 'idle'; // försök igen
+  onlineFails = 0;
+  if (Voice.synthOk == null && (S.engine === 'auto' || S.engine === 'browser')) await Voice.probe();
+  Voice.choose();
+  if (Voice.active === 'text'){ showMsg(S.engine === 'text' ? 'Du har valt Endast text.' : 'Ingen röst fungerar i den här webbläsaren just nu. Texten visas på skärmen.', 'info', 6000); return; }
+  const name = {browser: 'webbläsarens röst', neural: 'lokala AI-rösten', online: 'online-rösten'}[Voice.active];
+  if (Voice.active === 'neural' && Neural.state !== 'ready') showMsg('Laddar den svenska AI-rösten… följ förloppet uppe till höger (Röst: laddar %).', 'info', 15000);
+  Voice.lastResult = ''; const t0 = Date.now();
+  Voice.speak([{text: 'Hej! Så här låter reseguiden. Välkommen till TeslaZanders.', lang: 'sv'}], () => {
+    const ok = Voice.lastResult === 'ok' || Voice.active === 'browser';
+    if (Voice.active === 'neural' && Neural.state !== 'ready') showMsg('Den lokala rösten kunde inte laddas: ' + (Neural.err || 'okänt fel') + '.', 'error', 10000);
+    else showMsg(ok ? `✓ Rösttest klart med ${name}.` + (Voice.active === 'neural' && Neural.stats.length ? ` (${Neural.stats[Neural.stats.length - 1].ms} ms att skapa talet)` : '') : `✗ Ingen ljudsignal från ${name}. Kontrollera volymen eller välj en annan röst.`, ok ? 'info' : 'error', 7000);
+    updateVoiceChip();
+  }, {wait: true});
+  updateVoiceChip(); };
 $('bPlay').onclick = () => { paused = !paused; if (paused) Voice.stop(); else lastTell = Date.now() - 1e9; updateButtons(); };
 $('bSkip').onclick = () => { Voice.stop(); skipNext = true; lastTell = Date.now() - 1e9; if (current) markTold(current); setTimeout(tick, 200); };
 $('bMore').onclick = () => tellMore();
@@ -618,7 +748,8 @@ $('bRepeat').onclick = () => repeat();
 $('tabHist').onclick = () => { tab = 'hist'; renderList(); };
 $('tabNear').onclick = () => { tab = 'near'; renderList(); if (running && pos) refresh(true).then(renderList); };
 if (Voice.hasSynth){ Voice.loadVoices(); try { speechSynthesis.addEventListener('voiceschanged', () => Voice.loadVoices()); } catch (e) {} }
+if (LS.get('ttsCached', 0) && S.engine !== 'text' && S.engine !== 'browser' && S.engine !== 'online') setTimeout(() => Neural.load(), 1500); // redan nedladdad – förbered i bakgrunden
 setInterval(() => { if (tab === 'hist') renderList(); }, 60000);
 renderList(); updateButtons();
 // för test/felsökning
-window.RG = {pool, details, ranked, pos: () => pos, heading: () => heading, Voice, hist: () => hist, told: () => told, current: () => current, apiCount: () => apiCount, shortText, introFor, S, startGuide, stopGuide, tick, refresh};
+window.RG = {Neural, Player, pool, details, ranked, pos: () => pos, heading: () => heading, Voice, hist: () => hist, told: () => told, current: () => current, apiCount: () => apiCount, shortText, introFor, S, startGuide, stopGuide, tick, refresh};
