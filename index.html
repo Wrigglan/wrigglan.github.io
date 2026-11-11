@@ -215,22 +215,33 @@ const ENGINES = {
     // = a + x/tau + x²/k, x = varv över målvarvet (friktion + pumpförluster). Anpassad till referensinspelningen: en blipp till
     // ca 1 500 r/min når halvvägs efter ca 1,3 s och tomgång efter ca 3 s. revDownCoupled: med kopplingen i följer varvet vägen mjukt.
     revDown:{a:110, tau:4, k:8000}, revDownCoupled:0.15,
-    pulseTau:0.00035, noiseMix:0.22, noiseTau:0.0014, variance:0, misfire:0,
-    knock:0.1, knockFreq:1600,
+    // v8: inställd mot referensvideon (Rwg1geTDOb8) med objektiva mått per avsnitt (tomgång, gaspådrag, topp, fri nedvarvning):
+    // spektrum i tersband, resonanstoppar, brus/ton-förhållande, smällarnas form och täthet, nivåer. Inget ljud från inspelningen används.
+    // Tomgången i referensen: brusiga smällar på 20–30 ms (flera småpulser) ca 5 gånger/s ovanpå en jämn matta ca 14 dB under –
+    // inga helt tysta takter. Därför: blast (smällkedja per tändning), missA (svag förbränning i stället för tystnad),
+    // missDec/missAdec (glesare smällar och djupare luckor vid fri nedvarvning).
+    pulseTau:0.00035, noiseMix:0.3, noiseTau:0.004, variance:0, misfire:0,
+    knock:0.03, knockFreq:1600,
     banks:1, bankDetune:1,
-    res:[[110,1.0,0.35],[480,9,0.5],[670,10,0.55],[1130,8,1.6],[1380,8,1.5]], direct:0.35,
+    // kroppsresonanser uppmätta i referensen (frekvens, Q ur -3 dB-bredd; förstärkning anpassad så att topparnas höjd stämmer)
+    res:[[110,1.0,0.22],[258,7,0.64],[486,20,0.5],[683,45,2.2],[1140,14,1.8],[1397,28,0.47],[1957,30,2.93],[2522,40,1.16],[3352,40,0.8],[4658,60,1.03]], direct:0.35,
     pipeMs:1.04, pipeFb:-0.5, pipeDamp:0.2,
-    lpLow:2500, lpHigh:4500, driveLow:1.6, driveHigh:3.2,
+    // v9: under gas var v8 för kraftigt (+18 dB över tomgång, hårt mättat). Nu ca +10 dB som referensens varvning (+6…+11 dB):
+    // loadAtt dämpar nivån med lasten, mindre mättnad (driveHigh), mindre plåt och rasp under gas. Tomgången (last 0) är oförändrad.
+    lpLow:5000, lpHigh:7000, driveLow:1.6, driveHigh:1.1, loadAtt:1.9,
     pops:0.3, popMinRpm:1300, intake:0.04, intakeFc:1200, mech:0.012, mechFreq:2400,
-    two:{scavBase:0.33, scavLoad:0.62, scavRpm:0.25, missThr:0.38, missK:1.4, missOver:0.35, missIdle:0.25, missLoad:0.22, missBoost:0.5, ampVar:0.6, tJit:0.22, tJitLoad:0.5,
-         hzF:1050, hzVar:0.12, hzQ:7, hzTau:0.0012, hzImp:4, hzGain:0.9,
-         weakIdle:0.6, raspF:2100, raspQ:1.2, raspTau:0.02, raspIdleX:1.0, raspG:0.32, raspLoad:0.6, floorF:1500, floorQ:0.7, floorG:0.03},
-    ring:{f:[1650,2550],q:14,gain:0.2,tau:0.004},
-    // plate = "plåtighet" under gas: tunna plåtmoder (oharmoniska, smala, ringer kort per puls), studs/skrammel från lös plåt
-    // (1–2 efterslag 2–7 ms efter pulsen) med asymmetrisk klippning, och en nasal burkton ~1,1 kHz. Allt skalas med last och varv,
-    // så tomgång (last 0) och gaslyft påverkas inte.
-    plate:{f:[1730,2270,2910,3320,4640], q:[28,32,26,30,24], tau:0.006, gain:0.9, imp:6, noise:0.2, rattle:0.6, clip:0.2,
+    two:{scavBase:0.33, scavLoad:0.62, scavRpm:0.25, missThr:0.38, missK:1.4, missOver:0.35, missIdle:0.29, missLoad:0.22, missBoost:0.5, ampVar:0.6, tJit:0.22, tJitLoad:0.5,
+         hzF:1050, hzVar:0.12, hzQ:7, hzTau:0.0012, hzImp:4, hzGain:1.64,
+         weakIdle:0.3, raspF:2100, raspQ:1.2, raspTau:0.02, raspIdleX:1.0, raspG:0.196, raspLoad:0.2, floorF:1500, floorQ:0.7, floorG:0.109,
+         mainK:0.19, blast:{att:0.003, dec:0.0232, rate:770, imp:0.935, noise:0.78, bip:0.05},
+         missA:0.3, missAln:0.5, missDec:0.8, missAdec:0.6},
+    ring:{f:[1957,3352],q:30,gain:0.2,tau:0.004},
+    // plate = "plåtighet" under gas: plåtmoder på referensens toppar (1957 Hz dubblerad, 2522, 3352, 4658 Hz), studs/skrammel från lös plåt
+    // med asymmetrisk klippning, och en nasal burkton ~1,1 kHz. Allt skalas med last och varv, så tomgång och gaslyft påverkas inte.
+    plate:{f:[1957,2522,1962,4658,3352], q:[30,40,30,60,40], tau:0.006, gain:0.8, imp:6, noise:0.2, rattle:0.6, clip:0.4,
            nasF:1150, nasQ:2.5, nasG:0.9},
+    // post = slut-EQ anpassad (minsta kvadrat) till skillnaden i tersbandsspektrum mot referensen
+    post:[['ls',133,2.5,-0.6],['pk',284,1.24,-8.5],['pk',2376,2.26,-10],['pk',3989,1.49,5.2],['hs',6999,0.91,-5.2]],
     turbo:null, fan:{k:0.38, q:9, gain:0.008}, tracks:0, wind:0.05, gain:3.0
   },
   harley: {
@@ -295,6 +306,14 @@ function dspFactory(){
   function bp(f,q,sr){ return bpCoef({x1:0,x2:0,y1:0,y2:0},f,q,sr); }
   function run(s,x){ const y=s.b0*x+s.b2*s.x2-s.a1*s.y1-s.a2*s.y2; s.x2=s.x1; s.x1=x; s.y2=s.y1; s.y1=y; return y; }
   function onePoleK(fc,sr){ return 1-Math.exp(-TAU*fc/sr); }
+  // allmän biquad (RBJ): peaking ('pk') och high-/lowshelf ('hs'/'ls'), används av Trabantens slut-EQ (c.post)
+  function bq(type,f,q,db,sr){ const A=Math.pow(10,db/40), w=TAU*Math.min(f,sr*0.45)/sr, cw=Math.cos(w), sw=Math.sin(w), al=sw/(2*q); let b0,b1,b2,a0,a1,a2;
+    if(type==='pk'){ b0=1+al*A; b1=-2*cw; b2=1-al*A; a0=1+al/A; a1=-2*cw; a2=1-al/A; }
+    else { const sA=2*Math.sqrt(A)*al, s=type==='hs'?1:-1;
+      b0=A*((A+1)+s*(A-1)*cw+sA); b1=-2*s*A*((A-1)+s*(A+1)*cw); b2=A*((A+1)+s*(A-1)*cw-sA);
+      a0=(A+1)-s*(A-1)*cw+sA; a1=2*s*((A-1)-s*(A+1)*cw); a2=(A+1)-s*(A-1)*cw-sA; }
+    return {b0:b0/a0,b1:b1/a0,b2:b2/a0,a1:a1/a0,a2:a2/a0,x1:0,x2:0,y1:0,y2:0}; }
+  function run2(s,x){ const y=s.b0*x+s.b1*s.x1+s.b2*s.x2-s.a1*s.y1-s.a2*s.y2; s.x2=s.x1; s.x1=x; s.y2=s.y1; s.y1=y; return y; }
 
   // ---------- Inspelningsbaserad motor: granulär återgivning med varvtalskarta ----------
   // Källan är en inspelning där varvtalet är uppmätt var 10:e ms. Korta korn (Hann-fönster, 50 % överlapp)
@@ -412,11 +431,14 @@ function dspFactory(){
       if(c.two){ const T=c.two, nf=c.fire.length; this.tsRes=new Float32Array(nf).fill(0.5); this.tsPend=new Int32Array(nf).fill(-1); this.tsAmp=new Float32Array(nf); this.tsBoost=new Uint8Array(nf);
         this.hzBp=bp(T.hzF,T.hzQ,sr); this.hzEnv=0; this.hzKick=0; this.dHz=Math.exp(-1/(T.hzTau*sr));
         // rasp: brusig avgasskur per tändning (10–20 ms) + konstant mekaniskt/fläktbrus, går förbi lågpassfiltret
-        this.rpBp=bp(T.raspF||2500,T.raspQ||0.7,sr); this.rpEnv=0; this.dRp=Math.exp(-1/((T.raspTau||0.01)*sr)); this.flBp=bp(T.floorF||2000,T.floorQ||0.5,sr); }
+        this.rpBp=bp(T.raspF||2500,T.raspQ||0.7,sr); this.rpEnv=0; this.dRp=Math.exp(-1/((T.raspTau||0.01)*sr)); this.flBp=bp(T.floorF||2000,T.floorQ||0.5,sr);
+        // (v8) blast: varje tändning blir en 20–30 ms brusig smällkedja (flera småpulser) i stället för ett enda klick
+        this.blT=0; this.blA=0; if(T.blast){ this.kBlA=1-Math.exp(-1/(T.blast.att*sr)); } }
       this.nasBp=null; this.plF=null;
       if(c.plate){ const P=c.plate; this.plF=P.f.map((f,i)=>bp(f,P.q[i],sr)); this.plEnv=0; this.plKick=0; this.dPl=Math.exp(-1/(P.tau*sr)); this.plReb=[-1,-1]; this.plRebA=[0,0];
         this.nasBp=bp(P.nasF,P.nasQ,sr); }
       this.plateOut=0;
+      this.postEq=c.post?[0,1].map(()=>c.post.map(e=>bq(e[0],e[1],e[2],e[3],sr))):null;
       this.lp1=[0,0]; this.lp2=[0,0]; this.dcx=[0,0]; this.dcy=[0,0];
       this.kR=1-Math.exp(-1/(c.inertia*sr)); this.kL=1-Math.exp(-1/(0.06*sr));
       if(c.revDown){ this.kRc=1-Math.exp(-1/((c.revDownCoupled||c.inertia)*sr)); }
@@ -528,11 +550,16 @@ function dspFactory(){
       // extra bortfall: på tomgång (ibland två i rad) och under gas (fler på låga/mellanvarv, färre nära max)
       const pIdle=(T.missIdle||0)*(1-lp)*(1-Math.min(1,ln*4))*(1-rN)*(res>T.missThr?1:0.35);
       const pLoad=(T.missLoad||0)*Math.min(1,lp*2.5)*(1-0.65*rN);
-      const pMiss=Math.max(0,Math.min(0.92,Math.max(0,(res-T.missThr)*T.missK*(1-0.85*lp)+T.missOver*ln+pIdle)+pLoad));
+      // (v8) fri nedvarvning (friläge/frihjul, gasen släppt): glesa smällar med tysta luckor, som i referensen
+      const dec=(T.missDec && lp<0.05 && this.tRpm<this.rpm-30)?Math.min(1,(this.rpm-this.tRpm)/300):0;
+      const pMiss=Math.max(0,Math.min(0.92,Math.max(0,(res-T.missThr)*T.missK*(1-0.85*lp)+T.missOver*ln+pIdle+(dec?T.missDec*dec:0))+pLoad));
       const pop=()=>{ if(c.pops && ln>0.12 && this.rpm>c.popMinRpm && u()<c.pops*ln && !this.popPending){
           this.popPending=1; this.popDelay=Math.floor(this.sr*(0.003+0.012*u())); this.popAmp=0.5+0.9*u(); } };
       if(u()<pMiss){ // feltändning: en "död" takt som spolar ur cylindern -> nästa tändning blir ren och hård
-        this.tsRes[k]=res*(1-scav)*0.3; if(this.tsBoost) this.tsBoost[k]=1; pop(); return; }
+        this.tsRes[k]=res*(1-scav)*0.3; if(this.tsBoost) this.tsBoost[k]=1; pop();
+        if(T.missA){ // (v8) som i referensen: sällan helt tyst – en svag, utspädd förbränning i stället
+          const per=this.sr*60/Math.max(300,this.rpm)/2; this.tsPend[k]=Math.floor(u()*T.tJit*per); this.tsAmp[k]=T.missA*(0.5+u())*(0.7+0.6*lp)*(1-(T.missAln||0)*ln)*(1-(T.missAdec||0)*dec); }
+        return; }
       let a=(0.5+0.5*lp)*(1-0.4*ln)*(0.5+0.95*(1-res))*Math.max(0.15,1+T.ampVar*this.rnd());
       if(this.cylAmp) a*=this.cylAmp[k];
       // tändningen efter ett bortfall smäller hårdare även under gas (färsk, outspädd laddning)
@@ -545,7 +572,8 @@ function dspFactory(){
     }
     twoInject(k,lp){
       const c=this.cfg, T=c.two, a=this.tsAmp[k], b=this.banks[0];
-      b.s1+=a*(1-this.cPulse); b.nEnv=Math.max(b.nEnv,a);
+      b.s1+=a*(T.mainK!=null?T.mainK:1)*(1-this.cPulse); b.nEnv=Math.max(b.nEnv,a);
+      if(T.blast) this.blT=Math.max(this.blT,a);
       if(c.knock) this.knockEnv=Math.max(this.knockEnv,a*c.knock*(0.6+0.6*lp));
       if(this.ringF) this.ringEnv=Math.max(this.ringEnv,a);
       if(this.rpBp) this.rpEnv=Math.max(this.rpEnv,a);
@@ -572,6 +600,8 @@ function dspFactory(){
       const kLP=onePoleK(fc,sr);
       const drive=c.driveLow+(c.driveHigh-c.driveLow)*lp0;
       const lvl=(0.42+0.58*(0.45*rN0+0.55*lp0))*(1-0.4*ln0);
+      // (v9) loadAtt/lnAtt: dämpar nivån under gas resp. motorbroms (påverkar inte tomgång, där last = 0)
+      const att=c.loadAtt?1/(1+c.loadAtt*lp0+(c.lnAtt||0)*ln0):1;
       if(c.fan){ bpCoef(this.fanBp, 120+this.rpm*c.fan.k, c.fan.q, sr); }
       const fadeTarget=this.on?1:0, kF=1-Math.exp(-1/(0.12*sr));
       const spdMs=this.speed/3.6;
@@ -593,6 +623,7 @@ function dspFactory(){
           this.ordAm[k]+= (1+0.3*this.rnd()-this.ordAm[k])*0.2; this.ordG[k]=OR.list[k][1]*roll*lvO*this.ordAm[k]*(f<25?f/25:1); } }
       // tvåtakts-rasp: längre utklingning på tomgång (blockvis)
       const dRpB=(c.two&&c.two.raspG)?Math.exp(-1/((c.two.raspTau||0.01)*(1+(c.two.raspIdleX||0)*(1-lp0)*(1-rN0))*sr)):0;
+      const dBl=(c.two&&c.two.blast)?Math.exp(-1/(c.two.blast.dec*Math.pow(c.idle/Math.max(c.idle,this.rpm),c.two.blast.rpmK||0.5)*sr)):0;
       for(let i=0;i<n;i++){
         if(c.revDown && this.tRpm<this.rpm){ // långsam nedvarvning
           if(this.coupled===true) this.rpm+=(this.tRpm-this.rpm)*this.kRc;
@@ -635,8 +666,11 @@ function dspFactory(){
         this.pos=nxt>=1?nxt-1:nxt;
         if(this.popPending){ if(--this.popDelay<=0){ this.popPending=0; this.popEnv=this.popAmp; banks[0].s1+=this.popAmp*0.6*(1-this.cPulse);} }
 
-        let hzOut=0, twoBright=0;
+        let hzOut=0, twoBright=0, blN=0;
         if(c.two){ const P=this.tsPend; for(let k=0;k<nf;k++){ if(P[k]>=0 && P[k]--===0) this.twoInject(k,lp); }
+          if(dBl && (this.blT>1e-5||this.blA>1e-5)){ const BL=c.two.blast; this.blA+=(this.blT-this.blA)*this.kBlA; this.blT*=dBl;
+            if(this.rnd()*0.5+0.5<BL.rate*(0.7+0.6*rN)/sr) banks[0].s1+=this.blA*BL.imp*(0.25+0.75*(this.rnd()*0.5+0.5))*(1-this.cPulse)*((this.rnd()*0.5+0.5)<(BL.bip||0)*lp?-1:1);
+            blN=this.rnd()*this.blA*BL.noise; }
           const T2=c.two; if(T2.raspG){ twoBright=run(this.rpBp,this.rnd()*this.rpEnv)*T2.raspG*(1+T2.raspLoad*lp)*(0.7+0.5*rN)+run(this.flBp,this.rnd())*T2.floorG*(0.6+0.8*rN)*(0.7+0.6*lp); this.rpEnv*=dRpB; }
           if(this.hzEnv>1e-5||this.hzKick){ hzOut=run(this.hzBp,this.hzKick*c.two.hzImp+this.rnd()*this.hzEnv)*c.two.hzGain; this.hzKick=0; this.hzEnv*=this.dHz; } }
         let plS=0;
@@ -652,6 +686,7 @@ function dspFactory(){
           B.s1*=this.cPulse; B.s2=B.s2*this.cPulse+B.s1;
           let x=B.s2*this.pNorm*(1-this.cPulse) + c.noiseMix*B.nEnv*this.rnd();
           if(hzOut && b===0) x+=hzOut;
+          if(blN && b===0) x+=blN;
           B.nEnv*=this.dNoise;
           // avgasrör: kamfilter med dämpad återkoppling
           const rd=B.buf[B.w];
@@ -714,8 +749,9 @@ function dspFactory(){
           v=this.lp2[s]*0.8+this.lp1[s]*0.2;
           if(this.plateOut) v+=this.plateOut;  // plåtljudet går förbi lågpassfiltret
           v=Math.tanh(v*drive*0.9)/Math.sqrt(drive);
-          const y=v-this.dcx[s]+0.997*this.dcy[s]; this.dcx[s]=v; this.dcy[s]=y;
-          ch[s]=y*lvl*c.gain;
+          let y=v-this.dcx[s]+0.997*this.dcy[s]; this.dcx[s]=v; this.dcy[s]=y;
+          if(this.postEq){ const Q=this.postEq[s]; for(let e=0;e<Q.length;e++) y=run2(Q[e],y); }
+          ch[s]=y*lvl*c.gain*att;
         }
         let sv=0;
         if(sb && sw>0.0001){ this.sLp+=(sb[i]-this.sLp)*kS; const v=this.sLp; const d=v-this.sDc+0.995*this.sDy; this.sDc=v; this.sDy=d; sv=d*sLvl*sw*2.2; }
