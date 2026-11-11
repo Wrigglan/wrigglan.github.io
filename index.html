@@ -175,7 +175,7 @@ const ENGINES = {
     pipeMs:9, pipeFb:-0.5, pipeDamp:0.35,
     lpLow:900, lpHigh:5200, driveLow:1.3, driveHigh:3.4,
     pops:0.07, popMinRpm:2200, intake:0.10, intakeFc:700, mech:0.025, mechFreq:2600,
-    turbo:null, fan:null, prop:null, tracks:0, wind:0, gain:1.8
+    turbo:null, fan:null, tracks:0, wind:0, gain:1.8
   },
   v12: {
     // Helt syntetiserad 65°-V12 (Ferrari/Lamborghini-karaktär): två bankar med var sitt avgassystem,
@@ -195,27 +195,43 @@ const ENGINES = {
     lpLow:1800, lpHigh:8500, driveLow:1.3, driveHigh:3.0,
     pops:0.05, popMinRpm:3500, intake:0.2, intakeFc:1600, mech:0.02, mechFreq:3800,
     orders:{list:[[1.5,0.10],[3,0.55],[4.5,0.14],[6,1],[7.5,0.1],[9,0.45],[12,0.6],[15,0.18],[18,0.28],[24,0.14]], gain:0.1, fmax:7500, lo:0.35},
-    turbo:null, fan:null, prop:null, tracks:0, wind:0, gain:1.7
+    turbo:null, fan:null, tracks:0, wind:0, gain:1.7
   },
-  merlin: {
-    // Rolls-Royce Merlin 66: 60°-V12, 27 liter, korta avgasstubbar (varje cylinder hörs), tvåstegskompressor,
-    // fyrbladig propeller (utväxling 0,477). Varvtalet stiger mjukt med farten (650 -> ca 2 950 r/min vid 260 km/h).
-    id:'merlin', name:'Spitfire', desc:'Rolls-Royce Merlin V12, 27 liter – djupt mullrande, kompressor och propeller',
-    cylinders:12, cycleDeg:720, mode:'prop',
-    fire:[[0,0],[60,1],[120,0],[180,1],[240,0],[300,1],[360,0],[420,1],[480,0],[540,1],[600,0],[660,1]],
-    cylAmp:[1,0.86,1.1,0.92,1.04,0.88,1.08,0.95,0.9,1.06,0.93,1.0],
-    idle:650, redline:3000, cruise:2850, inertia:0.22, flutter:0, jitter:0.006,
-    gears:[1], upCruise:0, upFull:0, down:0, shiftTime:0, aRef:8,
-    pulseTau:0.0016, noiseMix:0.42, noiseTau:0.0032, variance:0.12, misfire:0.008,
-    knock:0.03, knockFreq:1700,
-    banks:2, bankDetune:1.05,
-    res:[[70,1.0,1.2],[145,1.3,0.9],[310,1.8,0.35],[720,2.4,0.18],[1700,3,0.06]], direct:0.35,
-    pipeMs:2.2, pipeFb:-0.25, pipeDamp:0.3,
-    lpLow:900, lpHigh:4800, driveLow:1.8, driveHigh:3.6,
-    pops:0.06, popMinRpm:1400, intake:0.06, intakeFc:800, mech:0.03, mechFreq:2100,
-    orders:{list:[[0.5,0.45],[1,0.45],[1.5,0.4],[3,1],[4.5,0.3],[6,0.45],[9,0.14],[12,0.08]], gain:0.12, fmax:1500, lo:0.5},
-    turbo:{type:'sc', fmin:0, fk:0.62, gain:0.035, whoosh:0.025},
-    fan:null, prop:{blades:4, reduction:0.477, gain:0.24}, tracks:0, wind:0.10, gain:1.5
+  trabant: {
+    // Trabant 601, motor P65/P66: luftkyld tvåtakts radtvåa, 594,5 cc, 26 hk vid 4 200 r/min, kilremsdriven axialfläkt.
+    // Vevtapparna sitter 180° isär och en tvåtaktare tänder varje varv -> tändning var 180° = 2 pulser per varv (2·r/min/60 Hz).
+    // two = tvåtaktsmodell: dålig spolning på tomgång/låg last lämnar avgasrester i cylindern -> tändningen uteblir
+    // ("fyrtaktning", ibland 6-/8-taktning) och nästa tändning smäller hårdare. Varje puls får dessutom en tidsförskjutning
+    // och kraftig amplitudvariation (otakt), och portöppningen ger en Helmholtz-"plopp" runt 1 kHz.
+    // Avgassystemet (förljuddämpare + tunn plåtburk) modelleras som ihåligt rör (kamfilter) + smala burkresonanser 560–1500 Hz.
+    // Gaslyft: fler feltändningar och smällar/knaster. Fjärde växeln har frihjul (Freilauf): vid gaslyft rullar bilen och motorn går på tomgång.
+    // Verklig toppfart är ca 100–108 km/h; här är 4-växlad låda utdragen så att 260 km/h nås under varvtalsgränsen.
+    id:'trabant', name:'Trabant 601', desc:'P65/P66 tvåtakts-tvåa, 594 cc, 26 hk – ring-ding-ding och blå rök, 4 växlar',
+    cylinders:2, cycleDeg:360,
+    fire:[[0,0],[180,0]], cylAmp:[1,0.8],
+    idle:850, redline:4500, launch:2100, inertia:0.05, flutter:0.06, jitter:0.035,
+    gears:[12,22,37,60], upCruise:2700, upFull:4300, down:1350, shiftTime:0.5, aRef:9, freewheel:true,
+    // revDown: frikopplad motor (friläge, kopplingen nedtryckt vid växling, frihjul) varvar ner långsamt. Retardation (r/min per s)
+    // = a + x/tau + x²/k, x = varv över målvarvet (friktion + pumpförluster). Anpassad till referensinspelningen: en blipp till
+    // ca 1 500 r/min når halvvägs efter ca 1,3 s och tomgång efter ca 3 s. revDownCoupled: med kopplingen i följer varvet vägen mjukt.
+    revDown:{a:110, tau:4, k:8000}, revDownCoupled:0.15,
+    pulseTau:0.00035, noiseMix:0.22, noiseTau:0.0014, variance:0, misfire:0,
+    knock:0.1, knockFreq:1600,
+    banks:1, bankDetune:1,
+    res:[[110,1.0,0.35],[480,9,0.5],[670,10,0.55],[1130,8,1.6],[1380,8,1.5]], direct:0.35,
+    pipeMs:1.04, pipeFb:-0.5, pipeDamp:0.2,
+    lpLow:2500, lpHigh:4500, driveLow:1.6, driveHigh:3.2,
+    pops:0.3, popMinRpm:1300, intake:0.04, intakeFc:1200, mech:0.012, mechFreq:2400,
+    two:{scavBase:0.33, scavLoad:0.62, scavRpm:0.25, missThr:0.38, missK:1.4, missOver:0.35, missIdle:0.25, missLoad:0.22, missBoost:0.5, ampVar:0.6, tJit:0.22, tJitLoad:0.5,
+         hzF:1050, hzVar:0.12, hzQ:7, hzTau:0.0012, hzImp:4, hzGain:0.9,
+         weakIdle:0.6, raspF:2100, raspQ:1.2, raspTau:0.02, raspIdleX:1.0, raspG:0.32, raspLoad:0.6, floorF:1500, floorQ:0.7, floorG:0.03},
+    ring:{f:[1650,2550],q:14,gain:0.2,tau:0.004},
+    // plate = "plåtighet" under gas: tunna plåtmoder (oharmoniska, smala, ringer kort per puls), studs/skrammel från lös plåt
+    // (1–2 efterslag 2–7 ms efter pulsen) med asymmetrisk klippning, och en nasal burkton ~1,1 kHz. Allt skalas med last och varv,
+    // så tomgång (last 0) och gaslyft påverkas inte.
+    plate:{f:[1730,2270,2910,3320,4640], q:[28,32,26,30,24], tau:0.006, gain:0.9, imp:6, noise:0.2, rattle:0.6, clip:0.2,
+           nasF:1150, nasQ:2.5, nasG:0.9},
+    turbo:null, fan:{k:0.38, q:9, gain:0.008}, tracks:0, wind:0.05, gain:3.0
   },
   harley: {
     // 45°-V-twin (Milwaukee-Eight 114, 1 868 cc), gemensam vevtapp: tändning vid 0° och 315° -> 315°/405°-mellanrum
@@ -232,7 +248,7 @@ const ENGINES = {
     pipeMs:13, pipeFb:-0.35, pipeDamp:0.5,
     lpLow:650, lpHigh:4200, driveLow:1.9, driveHigh:4.2,
     pops:0.12, popMinRpm:1700, intake:0.08, intakeFc:600, mech:0.03, mechFreq:1900,
-    turbo:null, fan:null, prop:null, tracks:0, wind:0.04, gain:2.0
+    turbo:null, fan:null, tracks:0, wind:0.04, gain:2.0
   },
   mazda787b: {
     // R26B fyrrotors wankel, 2,6 liter, Le Mans 1991. Varje rotor tänder en gång per excenteraxelvarv -> 4 pulser/varv,
@@ -250,7 +266,7 @@ const ENGINES = {
     lpLow:2400, lpHigh:14000, driveLow:1.6, driveHigh:4.0,
     pops:0.1, popMinRpm:4000, intake:0.24, intakeFc:2500, mech:0.025, mechFreq:4500,
     orders:{list:[[1,0.12],[2,0.15],[4,1],[8,0.55],[12,0.3],[16,0.15]], gain:0.08, fmax:8000, lo:0.3},
-    turbo:null, fan:null, prop:null, tracks:0, wind:0, gain:1.7
+    turbo:null, fan:null, tracks:0, wind:0, gain:1.7
   },
   viggen: {
     // Volvo RM8 (dubbelströmsmotor) med efterbrännkammare. "Varvtal" = högtrycksrotorns varvtal i %.
@@ -389,10 +405,21 @@ function dspFactory(){
       this.mechBp=bp(c.mechFreq,1.4,sr); this.intakeLp=0; this.kIn=onePoleK(c.intakeFc,sr);
       this.whPh=0; this.spool=0; this.whooshBp=bp(2400,0.9,sr);
       this.fanBp=bp(1000,c.fan?c.fan.q:5,sr);
-      this.propPh=0; this.propLp=0; this.kProp=onePoleK(500,sr); this.windLp=0; this.kWind=onePoleK(350,sr);
+      this.windLp=0; this.kWind=onePoleK(350,sr);
+      // klang från cylinderlameller/plåt (tvåtaktaren): högt Q, exciteras av varje tändning
+      this.ringF=c.ring?c.ring.f.map(f=>bp(f,c.ring.q,sr)):null; this.ringEnv=0; this.dRing=c.ring?Math.exp(-1/(c.ring.tau*sr)):0;
       this.trackPh=0; this.trackEnv=0; this.trackBp1=bp(820,7,sr); this.trackBp2=bp(2300,9,sr); this.trackLow=bp(160,1.5,sr); this.dTrack=Math.exp(-1/(0.012*sr));
+      if(c.two){ const T=c.two, nf=c.fire.length; this.tsRes=new Float32Array(nf).fill(0.5); this.tsPend=new Int32Array(nf).fill(-1); this.tsAmp=new Float32Array(nf); this.tsBoost=new Uint8Array(nf);
+        this.hzBp=bp(T.hzF,T.hzQ,sr); this.hzEnv=0; this.hzKick=0; this.dHz=Math.exp(-1/(T.hzTau*sr));
+        // rasp: brusig avgasskur per tändning (10–20 ms) + konstant mekaniskt/fläktbrus, går förbi lågpassfiltret
+        this.rpBp=bp(T.raspF||2500,T.raspQ||0.7,sr); this.rpEnv=0; this.dRp=Math.exp(-1/((T.raspTau||0.01)*sr)); this.flBp=bp(T.floorF||2000,T.floorQ||0.5,sr); }
+      this.nasBp=null; this.plF=null;
+      if(c.plate){ const P=c.plate; this.plF=P.f.map((f,i)=>bp(f,P.q[i],sr)); this.plEnv=0; this.plKick=0; this.dPl=Math.exp(-1/(P.tau*sr)); this.plReb=[-1,-1]; this.plRebA=[0,0];
+        this.nasBp=bp(P.nasF,P.nasQ,sr); }
+      this.plateOut=0;
       this.lp1=[0,0]; this.lp2=[0,0]; this.dcx=[0,0]; this.dcy=[0,0];
       this.kR=1-Math.exp(-1/(c.inertia*sr)); this.kL=1-Math.exp(-1/(0.06*sr));
+      if(c.revDown){ this.kRc=1-Math.exp(-1/((c.revDownCoupled||c.inertia)*sr)); }
       if(this.rpm<=0) this.rpm=c.idle;
       this.kLP=0.2; this.drive=1;
     }
@@ -493,7 +520,45 @@ function dspFactory(){
         L[i]=out[0]; R[i]=out[1];
       }
     }
-    setParams(p){ if(p.rpm!=null)this.tRpm=p.rpm; if(p.load!=null)this.tLoad=p.load; if(p.speed!=null)this.speed=p.speed; if(p.on!=null)this.on=p.on; if(p.ab!=null)this.ab=p.ab; }
+    // ---------- Tvåtaktsmodell (Trabant): spolning, fyrtaktning, otakt ----------
+    twoFire(k,rN,lp,ln){
+      const c=this.cfg, T=c.two, u=()=>this.rnd()*0.5+0.5;
+      const scav=Math.min(0.97,T.scavBase+T.scavLoad*lp+T.scavRpm*rN);  // andel avgaser som spolas ut
+      const res=this.tsRes[k];
+      // extra bortfall: på tomgång (ibland två i rad) och under gas (fler på låga/mellanvarv, färre nära max)
+      const pIdle=(T.missIdle||0)*(1-lp)*(1-Math.min(1,ln*4))*(1-rN)*(res>T.missThr?1:0.35);
+      const pLoad=(T.missLoad||0)*Math.min(1,lp*2.5)*(1-0.65*rN);
+      const pMiss=Math.max(0,Math.min(0.92,Math.max(0,(res-T.missThr)*T.missK*(1-0.85*lp)+T.missOver*ln+pIdle)+pLoad));
+      const pop=()=>{ if(c.pops && ln>0.12 && this.rpm>c.popMinRpm && u()<c.pops*ln && !this.popPending){
+          this.popPending=1; this.popDelay=Math.floor(this.sr*(0.003+0.012*u())); this.popAmp=0.5+0.9*u(); } };
+      if(u()<pMiss){ // feltändning: en "död" takt som spolar ur cylindern -> nästa tändning blir ren och hård
+        this.tsRes[k]=res*(1-scav)*0.3; if(this.tsBoost) this.tsBoost[k]=1; pop(); return; }
+      let a=(0.5+0.5*lp)*(1-0.4*ln)*(0.5+0.95*(1-res))*Math.max(0.15,1+T.ampVar*this.rnd());
+      if(this.cylAmp) a*=this.cylAmp[k];
+      // tändningen efter ett bortfall smäller hårdare även under gas (färsk, outspädd laddning)
+      if(this.tsBoost && this.tsBoost[k]){ a*=1+(T.missBoost||0)*lp; this.tsBoost[k]=0; }
+      else if(T.weakIdle) a*=1-T.weakIdle*(1-lp)*(1-rN)*(1-Math.min(1,ln*4));  // på tomgång är de flesta tändningar svaga, smällen kommer efter bortfall
+      this.tsRes[k]=1-scav;
+      const per=this.sr*60/Math.max(300,this.rpm)/2;
+      this.tsPend[k]=Math.floor(u()*T.tJit*(1+(T.tJitLoad||0)*lp)*per); this.tsAmp[k]=a;
+      pop();
+    }
+    twoInject(k,lp){
+      const c=this.cfg, T=c.two, a=this.tsAmp[k], b=this.banks[0];
+      b.s1+=a*(1-this.cPulse); b.nEnv=Math.max(b.nEnv,a);
+      if(c.knock) this.knockEnv=Math.max(this.knockEnv,a*c.knock*(0.6+0.6*lp));
+      if(this.ringF) this.ringEnv=Math.max(this.ringEnv,a);
+      if(this.rpBp) this.rpEnv=Math.max(this.rpEnv,a);
+      // Helmholtz-puls när avgasporten öppnar (cylindervolym + port = "champagneflaska"), frekvensen varierar något per puls
+      bpCoef(this.hzBp,T.hzF*(1+T.hzVar*this.rnd())*(1+0.15*lp),T.hzQ,this.sr); this.hzEnv=Math.max(this.hzEnv,a); this.hzKick+=a;
+      if(c.plate && lp>0.02){ const P=c.plate, rN=Math.max(0,Math.min(1,(this.rpm-c.idle)/(c.redline-c.idle))), u=()=>this.rnd()*0.5+0.5;
+        const pa=a*Math.pow(lp,1.2)*(0.4+0.6*rN); this.plEnv=Math.max(this.plEnv,pa); this.plKick+=pa;
+        // lös plåt studsar: 1–2 efterslag, fler och starkare vid högre varv/last
+        const per=this.sr*60/Math.max(300,this.rpm)/2;
+        for(let j=0;j<2;j++){ if(u()<P.rattle*(0.5+0.5*rN)*(j?0.6:1)){ this.plReb[j]=Math.floor(Math.min(per*0.45,this.sr*(0.002+0.005*u()))*(j+1)); this.plRebA[j]=pa*(0.3+0.4*u()); } }
+      }
+    }
+    setParams(p){ if(p.rpm!=null)this.tRpm=p.rpm; if(p.load!=null)this.tLoad=p.load; if(p.speed!=null)this.speed=p.speed; if(p.on!=null)this.on=p.on; if(p.ab!=null)this.ab=p.ab; if(p.coupled!=null)this.coupled=p.coupled; }
     process(L,R,n){
       const c=this.cfg; if(!c){ for(let i=0;i<n;i++){L[i]=0;R[i]=0;} return; }
       if(c.mode==='warp'){ this.processWarp(L,R,n); return; }
@@ -526,8 +591,13 @@ function dspFactory(){
       if(OR){ const lvO=OR.gain*((OR.lo||0.3)+(1-(OR.lo||0.3))*lp0)*(0.45+0.55*rN0)*(1-0.6*ln0);
         for(let k=0;k<nOr;k++){ const f=OR.list[k][0]*this.rpm/60; const roll=f<OR.fmax?1:Math.max(0,1-(f-OR.fmax)/(0.4*OR.fmax));
           this.ordAm[k]+= (1+0.3*this.rnd()-this.ordAm[k])*0.2; this.ordG[k]=OR.list[k][1]*roll*lvO*this.ordAm[k]*(f<25?f/25:1); } }
+      // tvåtakts-rasp: längre utklingning på tomgång (blockvis)
+      const dRpB=(c.two&&c.two.raspG)?Math.exp(-1/((c.two.raspTau||0.01)*(1+(c.two.raspIdleX||0)*(1-lp0)*(1-rN0))*sr)):0;
       for(let i=0;i<n;i++){
-        this.rpm+=(this.tRpm-this.rpm)*this.kR;
+        if(c.revDown && this.tRpm<this.rpm){ // långsam nedvarvning
+          if(this.coupled===true) this.rpm+=(this.tRpm-this.rpm)*this.kRc;
+          else { const RD=c.revDown, x=this.rpm-this.tRpm; this.rpm-=Math.min(x,(RD.a+x/RD.tau+x*x/RD.k)/sr); } }
+        else this.rpm+=(this.tRpm-this.rpm)*this.kR;
         this.load+=(this.tLoad-this.load)*this.kL;
         this.fade+=(fadeTarget-this.fade)*kF;
         const load=this.load, lp=load>0?load:0, ln=load<0?-load:0;
@@ -546,6 +616,7 @@ function dspFactory(){
         for(let k=0;k<nf;k++){
           const f=fire[k][0];
           if((f>this.pos&&f<=nxt)||(nxt>=1&&f+1<=nxt)){
+            if(c.two){ this.twoFire(k,rN,lp,ln); continue; }
             const varScale=c.variance*(1+1.4*(1-rN));
             if(c.misfire && this.rnd()*0.5+0.5 < c.misfire*(1-rN)*(1-lp)) continue;
             let a=(0.5+0.5*lp)*(1-0.55*ln)*(1+varScale*this.rnd());
@@ -553,6 +624,7 @@ function dspFactory(){
             const b=banks[fire[k][1]%nb];
             b.s1+=a*(1-this.cPulse); b.nEnv=Math.max(b.nEnv,a);
             if(c.knock) this.knockEnv=Math.max(this.knockEnv,a*c.knock*(0.6+0.6*lp));
+            if(this.ringF) this.ringEnv=Math.max(this.ringEnv,a);
             // baksmällar vid motorbroms
             if(c.pops && ln>0.15 && this.rpm>c.popMinRpm && (this.rnd()*0.5+0.5)<c.pops*ln){
               this.popPending=1; this.popDelay=Math.floor(sr*(0.004+0.01*(this.rnd()*0.5+0.5)));
@@ -563,11 +635,23 @@ function dspFactory(){
         this.pos=nxt>=1?nxt-1:nxt;
         if(this.popPending){ if(--this.popDelay<=0){ this.popPending=0; this.popEnv=this.popAmp; banks[0].s1+=this.popAmp*0.6*(1-this.cPulse);} }
 
+        let hzOut=0, twoBright=0;
+        if(c.two){ const P=this.tsPend; for(let k=0;k<nf;k++){ if(P[k]>=0 && P[k]--===0) this.twoInject(k,lp); }
+          const T2=c.two; if(T2.raspG){ twoBright=run(this.rpBp,this.rnd()*this.rpEnv)*T2.raspG*(1+T2.raspLoad*lp)*(0.7+0.5*rN)+run(this.flBp,this.rnd())*T2.floorG*(0.6+0.8*rN)*(0.7+0.6*lp); this.rpEnv*=dRpB; }
+          if(this.hzEnv>1e-5||this.hzKick){ hzOut=run(this.hzBp,this.hzKick*c.two.hzImp+this.rnd()*this.hzEnv)*c.two.hzGain; this.hzKick=0; this.hzEnv*=this.dHz; } }
+        let plS=0;
+        if(c.plate && (this.plEnv>1e-5||this.plKick||this.plReb[0]>=0||this.plReb[1]>=0)){ const P=c.plate;
+          for(let j=0;j<2;j++){ if(this.plReb[j]>=0 && this.plReb[j]--===0) { this.plEnv=Math.max(this.plEnv,this.plRebA[j]); this.plKick+=this.plRebA[j]; } }
+          const ex=this.plKick*P.imp+this.rnd()*this.plEnv*P.noise; this.plKick=0; for(let k=0;k<this.plF.length;k++) plS+=run(this.plF[k],ex)*(k&1?-1:1);
+          plS*=P.gain; const cl=P.clip; plS=plS>cl*0.6?cl*0.6:(plS<-cl?-cl:plS);  // asymmetrisk klippning = skrammel
+          this.plEnv*=this.dPl; }
+        this.plateOut=plS+twoBright;
         let outL=0,outR=0;
         for(let b=0;b<nb;b++){
           const B=banks[b];
           B.s1*=this.cPulse; B.s2=B.s2*this.cPulse+B.s1;
           let x=B.s2*this.pNorm*(1-this.cPulse) + c.noiseMix*B.nEnv*this.rnd();
+          if(hzOut && b===0) x+=hzOut;
           B.nEnv*=this.dNoise;
           // avgasrör: kamfilter med dämpad återkoppling
           const rd=B.buf[B.w];
@@ -576,6 +660,7 @@ function dspFactory(){
           B.buf[B.w]=y; if(++B.w>=B.D)B.w=0;
           let o=c.direct*y;
           for(let r=0;r<B.res.length;r++){ const R0=B.res[r]; o+=R0.g*run(R0.f,y); }
+          if(this.nasBp && b===0){ const nz=run(this.nasBp,y); if(lp>0) o+=c.plate.nasG*lp*(0.5+0.5*rN)*nz; }
           if(nb===1){ outL+=o; outR+=o; }
           else if(b===0){ outL+=o; outR+=o*0.55; } else { outR+=o; outL+=o*0.55; }
         }
@@ -606,14 +691,9 @@ function dspFactory(){
           common+=run(this.whooshBp,this.rnd())*T.whoosh*this.spool*(0.4+lp);
         }
         if(c.fan){ common+=run(this.fanBp,this.rnd())*c.fan.gain*(0.3+rN)*2; }
-        // propeller (bladpassagefrekvens) och fartvind
-        if(c.prop){
-          const P=c.prop; const bpf=this.rpm*P.reduction/60*P.blades;
-          this.propPh+=bpf/sr; if(this.propPh>=1)this.propPh-=1;
-          const pc=Math.cos(TAU*this.propPh); const pulse=Math.pow(0.5+0.5*pc,6)-0.25;
-          this.propLp+=(pulse-this.propLp)*this.kProp;
-          common+=this.propLp*P.gain*(0.35+0.65*rN)*(0.6+0.6*lp)*3;
-        }
+        if(this.ringF && this.ringEnv>1e-5){ const ex=this.rnd()*this.ringEnv; let rs=0; for(let k=0;k<this.ringF.length;k++) rs+=run(this.ringF[k],ex)/(k+1);
+          common+=rs*c.ring.gain*(0.5+0.5*rN); this.ringEnv*=this.dRing; }
+        // fartvind
         if(c.wind){ this.windLp+=(this.rnd()-this.windLp)*this.kWind; common+=this.windLp*c.wind*Math.min(1,this.speed/(c.legacy?120:220))*3; }
         // larvband
         if(c.tracks && spdMs>0.3){
@@ -632,6 +712,7 @@ function dspFactory(){
           let v=ch[s];
           this.lp1[s]+=(v-this.lp1[s])*kLP; this.lp2[s]+=(this.lp1[s]-this.lp2[s])*kLP;
           v=this.lp2[s]*0.8+this.lp1[s]*0.2;
+          if(this.plateOut) v+=this.plateOut;  // plåtljudet går förbi lågpassfiltret
           v=Math.tanh(v*drive*0.9)/Math.sqrt(drive);
           const y=v-this.dcx[s]+0.997*this.dcy[s]; this.dcx[s]=v; this.dcy[s]=y;
           ch[s]=y*lvl*c.gain;
@@ -859,13 +940,7 @@ const Sim = {
       this.disp+=(rpmT-this.disp)*Math.min(1,dt/E.inertia);
       return {rpm:rpmT, load, speed:v, gearLbl, ab:st};
     }
-    if(E.mode==='prop'){
-      // varvtalet stiger mjukt och hela vägen till 260 km/h (snabbare i början, planar ut mot toppen)
-      const ss=(1-Math.exp(-v/110))/(1-Math.exp(-MAX_KMH/110)), s50=Math.min(1,v/50);
-      rpmT=E.idle+(E.cruise-E.idle)*Math.min(1,ss)+120*Math.max(0,load)*s50-140*Math.max(0,-load)*s50;
-      rpmT=Math.min(E.redline,Math.max(E.idle,rpmT));
-      gearLbl = stopped?'—':(load>0.5?'Full':(load<-0.2?'Glid':'Fart'));
-    }else{
+    {
       const G=E.gears, n=G.length, r=g=>v/G[g]*1000;
       if(now>this.shiftUntil){
         const lp=Math.max(0,Math.min(1,load));
@@ -891,6 +966,8 @@ const Sim = {
         if(this.shiftKind==='up') load=-0.25; else load=0.45; // gaslyft vid uppväxling, mellangas vid nedväxling
         if(this.shiftKind==='down') rpmT*=1.06;
       }
+      // frihjul i högsta växeln (Trabant): vid gaslyft kopplar frihjulet ur och motorn faller till tomgång
+      if(E.freewheel && this.gear===n-1 && load<-0.05 && now>=this.shiftUntil){ rpmT=E.idle; load=0; this.fw=true; } else this.fw=false;
       if(rpmT>E.redline){ // varvbegränsare
         this.limT+=dt; const cut=(Math.floor(this.limT*9)%2)===0;
         rpmT=E.redline-(cut?E.redline*0.03:0); if(cut) load=-0.3;
@@ -899,8 +976,13 @@ const Sim = {
     }
     if(stopped){ rpmT=E.idle*(1+0.012*Math.sin(now*1.7)+0.006*Math.sin(now*4.3)); }
     this.rpmT=rpmT; this.load=load;
-    this.disp+= (rpmT-this.disp)*Math.min(1,dt/Math.max(0.05,E.inertia));
-    return {rpm:rpmT, load, speed:v, gearLbl};
+    let coupled;
+    if(E.revDown){ // är motorn kopplad till hjulen? (inte i friläge, under växling eller i frihjul)
+      coupled=!(stopped || v<3 || now<this.shiftUntil || this.fw);
+      if(rpmT<this.disp && !coupled){ const RD=E.revDown, x=this.disp-rpmT; this.disp-=Math.min(x,(RD.a+x/RD.tau+x*x/RD.k)*dt); }
+      else { const tau=rpmT<this.disp?(E.revDownCoupled||E.inertia):E.inertia; this.disp+=(rpmT-this.disp)*Math.min(1,dt/Math.max(0.05,tau)); }
+    } else this.disp+= (rpmT-this.disp)*Math.min(1,dt/Math.max(0.05,E.inertia));
+    return {rpm:rpmT, load, speed:v, gearLbl, coupled};
   }
 };
 
@@ -927,7 +1009,7 @@ function buildEngines(){
 function selectEngine(id){
   engineId=id; localStorage.setItem('motorljud.engine',id);
   [...ui.engines.children].forEach(b=>b.classList.toggle('sel',b.dataset.id===id));
-  const E=ENGINES[id]; ui.engTitle.textContent='· '+E.name; ui.gearLbl.textContent=(E.mode==='prop'||E.mode==='jet')?'Läge':(E.mode==='warp'?'Fart':'Växel'); $('rpmLbl').textContent=E.mode==='warp'?'Kärneffekt':(E.mode==='jet'?'Varvtal':'r/min');
+  const E=ENGINES[id]; ui.engTitle.textContent='· '+E.name; ui.gearLbl.textContent=E.mode==='jet'?'Läge':(E.mode==='warp'?'Fart':'Växel'); $('rpmLbl').textContent=E.mode==='warp'?'Kärneffekt':(E.mode==='jet'?'Varvtal':'r/min');
   document.body.classList.toggle('warp',E.mode==='warp');
   Sim.setEngine(E); tach.setup(E);
   if(Audio.ready){
@@ -1068,7 +1150,7 @@ function tick(){
   const nowMs=performance.now(), dt=Math.min(0.1,(nowMs-lastT)/1000); lastT=nowMs; const now=nowMs/1000;
   const src = Demo.on ? Demo.step(dt) : (running ? Speed.estimate() : {v:0,a:0});
   const out = Sim.step(dt, src, now);
-  if(running && nowMs-lastSend>25){ Audio.send({p:{rpm:out.rpm,load:out.load,speed:out.speed,ab:out.ab}}); lastSend=nowMs; }
+  if(running && nowMs-lastSend>25){ Audio.send({p:{rpm:out.rpm,load:out.load,speed:out.speed,ab:out.ab,coupled:out.coupled}}); lastSend=nowMs; }
   window.__state={v:Sim.v,rpm:Sim.disp,rpmT:out.rpm,gear:out.gearLbl,load:out.load,engine:engineId,audio:Audio.mode||null,running};
   return out;
 }
@@ -1087,7 +1169,7 @@ window.addEventListener('resize',()=>tach.resize());
 
 // Inga inspelningar används längre – alla ljud syntetiseras
 const CREDITS = {
-  all:'inga – alla motorljud (V8, V12, Spitfire, Harley-Davidson, Mazda 787B, AJS 37 Viggen och Enterprise) syntetiseras i realtid i webbläsaren'
+  all:'inga – alla motorljud (V8, V12, Trabant 601, Harley-Davidson, Mazda 787B, AJS 37 Viggen och Enterprise) syntetiseras i realtid i webbläsaren'
 };
 function updateSrcInfo(){
   const E=ENGINES[engineId], el=$('srcInfo'); if(!el) return;
