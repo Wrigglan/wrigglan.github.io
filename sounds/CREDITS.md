@@ -1,8 +1,8 @@
 # Ljudkällor och licenser – Motorljud
 
-**Inga inspelningar används.** Alla motorljud – V8, V12, Spitfire (Rolls-Royce Merlin), Harley-Davidson,
+**Inga inspelningar används.** Alla motorljud – V8, V12, Trabant 601 (tvåtaktsmotor P65/P66), Harley-Davidson,
 Mazda 787B, AJS 37 Viggen (Volvo RM8) och Enterprise – syntetiseras i realtid med Web Audio direkt i webbläsaren.
-Ljuden är egenkomponerade modeller (tändpulser, avgasresonanser, motorordningar, turbin- och brusmodeller) och
+Ljuden är egenkomponerade modeller (tändpulser, tvåtaktspulser, avgasresonanser, motorordningar, turbin- och brusmodeller) och
 innehåller inget inspelat material från tillverkare, filmer eller andra källor.
 
 Enterprise-ljudet (varpkärnans brus och impuls) är egenkomponerat – inget ljud från Star Trek används.
